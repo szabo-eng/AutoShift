@@ -1,148 +1,147 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 
 # --- הגדרות דף ---
-st.set_page_config(page_title="אוטומציית שיבוץ", layout="wide")
+st.set_page_config(page_title="מערכת שיבוץ חכמה", layout="wide")
 
-# --- חיבור ל-Firebase Firestore ---
-# ב-Streamlit Cloud, נשתמש ב-Secrets כדי לשמור על המפתח
+# --- חיבור ל-Firebase ---
 if not firebase_admin._apps:
     try:
-        # כאן אנחנו טוענים את המפתח מתוך ה-Secrets של Streamlit
-        firebase_creds = dict(st.secrets["firebase"])
-        cred = credentials.Certificate(firebase_creds)
+        # טעינת סודות מתוך Streamlit Cloud Secrets
+        firebase_info = dict(st.secrets["firebase"])
+        cred = credentials.Certificate(firebase_info)
         firebase_admin.initialize_app(cred)
     except Exception as e:
-        st.error("שגיאה בחיבור ל-Firebase. וודא שהגדרת את ה-Secrets.")
+        st.error("שגיאה בחיבור ל-Firebase. וודא שה-Secrets מוגדרים כהלכה.")
 
 db = firestore.client()
 
-# --- פונקציות עזר ללוגיקה ---
+# --- פונקציות בסיס נתונים ---
 
-def get_history_scores():
-    """שליפת היסטוריית המשמרות מ-Firestore"""
+def get_balance_from_db():
+    """שליפת הניקוד של כל העובדים מ-Firestore"""
     scores = {}
     docs = db.collection('employee_history').stream()
     for doc in docs:
         scores[doc.id] = doc.to_dict().get('total_shifts', 0)
     return scores
 
-def update_history(assigned_names):
-    """עדכון מספר המשמרות ב-Firestore לאחר שיבוץ"""
+def update_db_balance(assigned_names):
+    """עדכון המאזן ב-Firestore עבור אלו ששובצו"""
+    batch = db.batch()
     for name in assigned_names:
         doc_ref = db.collection('employee_history').document(name)
-        doc = doc_ref.get()
-        if doc.exists:
-            doc_ref.update({'total_shifts': firestore.Increment(1)})
-        else:
-            doc_ref.set({'total_shifts': 1})
+        # שימוש ב-Increment כדי למנוע בעיות סנכרון
+        batch.set(doc_ref, {'total_shifts': firestore.Increment(1)}, merge=True)
+    batch.commit()
 
 # --- ממשק המשתמש ---
 
-st.title("📅 מערכת אוטומציה לשיבוץ משמרות")
+st.title("🛡️ מערכת שיבוץ משמרות מאוזנת")
 
 with st.sidebar:
-    st.header("טעינת קבצים")
-    req_file = st.file_uploader("העלה REQ.csv", type=['csv'])
-    shifts_file = st.file_uploader("העלה SHIFTS.csv", type=['csv'])
+    st.header("1. טעינת נתונים")
+    req_file = st.file_uploader("העלה קובץ בקשות (REQ.csv)", type=['csv'])
+    shifts_file = st.file_uploader("העלה תבנית משמרות (SHIFTS.csv)", type=['csv'])
 
 if req_file and shifts_file:
+    # קריאת הקבצים
     req_df = pd.read_csv(req_file)
     shifts_template = pd.read_csv(shifts_file)
     
-    # חילוץ תאריכים ייחודיים מקובץ הבקשות
+    # --- ניקוי עמודות (טיפול ב-KeyError) ---
+    req_df.columns = req_df.columns.str.replace('"', '').str.strip()
+    shifts_template.columns = shifts_template.columns.str.replace('"', '').str.strip()
+    
+    # חילוץ תאריכים
     dates = sorted(req_df['תאריך מבוקש'].unique())
     
-    st.subheader("ניהול משמרות שבועי")
-    st.info("סמן משמרות כ'לא פעילות' במידה ואין בהן צורך ביום ספציפי.")
+    st.header("2. בקרה שבועית")
+    st.write("כבה משמרות שאינך מעוניין לאייש בשבוע זה:")
 
-    # הצגת לוח שנה שבועי (7 עמודות)
+    # יצירת לוח השנה
+    shift_toggles = {}
     cols = st.columns(len(dates))
-    shift_status = {} # מילון לשמירת מצב ה-Toggles
-
+    
     for i, date_str in enumerate(dates):
         with cols[i]:
-            st.markdown(f"**{date_str}**")
-            # מעבר על התבנית לכל יום
+            st.markdown(f"### {date_str}")
             for idx, row in shifts_template.iterrows():
+                # מזהה ייחודי למשמרת: תאריך + תחנה + סוג + אינדקס
                 key = f"{date_str}_{row['תחנה']}_{row['משמרת']}_{idx}"
-                label = f"{row['משמרת']} - {row['תחנה']}"
-                # Toggle לסימון אם המשמרת פעילה
-                shift_status[key] = st.toggle(label, value=True, key=key)
+                label = f"{row['משמרת']} | {row['תחנה']}"
+                shift_toggles[key] = st.toggle(label, value=True, key=key)
 
-    # --- כפתור הפעלה ---
-    if st.button("הפעל אלגוריתם שיבוץ חכם", type="primary"):
-        with st.spinner("מחשב שיבוץ אופטימלי ומתחשב באיזון..."):
+    # --- הפעלת האלגוריתם ---
+    if st.button("🚀 הרץ שיבוץ אוטומטי", type="primary"):
+        with st.spinner("מבצע אופטימיזציה מול היסטוריית Firebase..."):
             
-            history_scores = get_history_scores()
+            history_scores = get_balance_from_db()
             final_schedule = []
-            already_assigned_today = {date: set() for date in dates}
+            assigned_today = {date: set() for date in dates}
 
-            # מעבר על כל יום וכל משמרת בתבנית
             for date in dates:
                 for idx, shift_row in shifts_template.iterrows():
                     key = f"{date}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
                     
-                    if not shift_status[key]: # אם המשתמש ביטל את המשמרת
+                    if not shift_toggles[key]:
                         continue
 
-                    # סינון מועמדים מתאימים מ-REQ
+                    # סינון מועמדים רלוונטיים
                     candidates = req_df[
                         (req_df['תאריך מבוקש'] == date) & 
                         (req_df['משמרת'] == shift_row['משמרת']) & 
                         (req_df['תחנה'] == shift_row['תחנה'])
                     ]
 
-                    # סינון לפי מורשה אט"ן אם נדרש
+                    # בדיקת מורשה אט"ן
                     if "אט\"ן" in str(shift_row['סוג תקן']):
-                        candidates = candidates[candidates['"מורשה אט""ן"'] == 'כן']
+                        candidates = candidates[candidates['מורשה אט"ן'] == 'כן']
 
-                    # סינון אנשים שכבר שובצו היום בתחנה אחרת
-                    candidates = candidates[~candidates['שם'].isin(already_assigned_today[date])]
+                    # מניעת כפל שיבוץ באותו יום
+                    candidates = candidates[~candidates['שם'].isin(assigned_today[date])]
 
                     if not candidates.empty:
-                        # הוספת ציון היסטורי לכל מועמד (אם אין לו היסטוריה, הציון הוא 0)
+                        # הצמדת ציון היסטורי (איזון)
                         candidates = candidates.copy()
-                        candidates['score'] = candidates['שם'].map(lambda x: history_scores.get(x, 0))
+                        candidates['balance_score'] = candidates['שם'].map(lambda x: history_scores.get(x, 0))
                         
-                        # בחירת העובד עם הציון הנמוך ביותר (הכי פחות משמרות בעבר)
-                        chosen_one = candidates.sort_values(by='score').iloc[0]
-                        name = chosen_one['שם']
+                        # בחירת העובד עם הכי פחות משמרות (הציון הכי נמוך)
+                        best_match = candidates.sort_values(by='balance_score').iloc[0]
+                        name = best_match['שם']
                         
-                        # רישום השיבוץ
                         final_schedule.append({
                             'תאריך': date,
                             'משמרת': shift_row['משמרת'],
                             'תחנה': shift_row['תחנה'],
                             'שעות': shift_row['שעות'],
-                            'שם משובץ': name
+                            'שיבוץ': name
                         })
-                        already_assigned_today[date].add(name)
+                        assigned_today[date].add(name)
+                        # עדכון הניקוד המקומי כדי לא לשבץ אותו פעמיים ברצף אם יש אחרים
+                        history_scores[name] = history_scores.get(name, 0) + 1
                     else:
-                        # משמרת שלא נמצא לה שיבוץ
                         final_schedule.append({
                             'תאריך': date,
                             'משמרת': shift_row['משמרת'],
                             'תחנה': shift_row['תחנה'],
                             'שעות': shift_row['שעות'],
-                            'שם משובץ': "❌ לא אויש"
+                            'שיבוץ': "⚠️ לא נמצא מבקש מתאים"
                         })
 
             # הצגת תוצאות
-            results_df = pd.DataFrame(final_schedule)
-            st.success("השיבוץ הסתיים!")
-            st.dataframe(results_df, use_container_width=True)
+            st.header("3. תוצאות השיבוץ")
+            res_df = pd.DataFrame(final_schedule)
+            st.table(res_df)
 
-            # עדכון Firebase בשיבוצים החדשים (רק עבור אלו שבאמת שובצו)
-            names_to_update = [s['שם משובץ'] for s in final_schedule if "❌" not in s['שם משובץ']]
-            update_history(names_to_update)
-
-            # אפשרות הורדה
-            csv = results_df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("הורד קובץ שיבוץ סופי (CSV)", data=csv, file_name="final_schedule.csv")
-
-else:
-    st.warning("אנא העלה את שני קבצי ה-CSV כדי להתחיל.")
+            # עדכון בסיס נתונים
+            final_names = [s['שיבוץ'] for s in final_schedule if "⚠️" not in s['שיבוץ']]
+            update_db_balance(final_names)
+            
+            st.success(f"השיבוץ הסתיים! עודכנו {len(final_names)} רשומות ב-Firebase.")
+            
+            # הורדה
+            csv_data = res_df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 הורד קובץ שיבוץ", csv_data, "schedule.csv", "text/csv")
