@@ -5,9 +5,9 @@ from firebase_admin import credentials, firestore
 from datetime import datetime
 
 # --- הגדרות דף ---
-st.set_page_config(page_title="ניהול שיבוץ - כותרות דביקות", layout="wide")
+st.set_page_config(page_title="ניהול שיבוץ - תצוגה קומפקטית", layout="wide")
 
-# --- הזרקת CSS ל-RTL וכותרות דביקות ---
+# --- הזרקת CSS ל-RTL וכותרות דביקות קטנות ---
 st.markdown("""
     <style>
     /* כיוון RTL כללי */
@@ -16,35 +16,50 @@ st.markdown("""
         text-align: right;
     }
 
-    /* הגדרת הכותרת כדביקה */
+    /* כותרת דביקה קומפקטית */
     .sticky-header {
         position: -webkit-sticky;
         position: sticky;
-        top: 0; /* נצמד לראש מיכל התוכן */
-        background-color: white;
+        top: 0;
+        background-color: #f8f9fa; /* אפור בהיר מאוד להפרדה */
         z-index: 1000;
-        padding: 10px;
-        border-bottom: 3px solid #1f77b4;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 5px 2px; /* צמצום רווחים */
+        border-bottom: 2px solid #1f77b4;
+        margin-bottom: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border-radius: 4px;
     }
 
-    /* יישור טקסט בתוך הכותרת */
-    .sticky-header h3, .sticky-header h4 {
+    /* הקטנת פונט בכותרת */
+    .sticky-header h5 {
         margin: 0;
         text-align: center;
+        font-size: 0.95rem !important; /* פונט קטן וקריא */
+        font-weight: bold;
+        color: #1f77b4;
+    }
+    .sticky-header p {
+        margin: 0;
+        text-align: center;
+        font-size: 0.8rem !important;
+        color: #555;
     }
 
-    /* תיקון רווחים ב-Streamlit שעלולים להסתיר את הכותרת */
+    /* הקטנת רווחים בין אלמנטים ב-Streamlit */
+    [data-testid="stVerticalBlock"] {
+        gap: 0.5rem;
+    }
+    
+    /* הצמדת הכותרת מתחת לסרגל Streamlit */
     [data-testid="stVerticalBlock"] > div:has(div.sticky-header) {
         position: sticky;
-        top: 2.85rem; /* גובה הסרגל העליון של Streamlit */
+        top: 2.85rem;
         z-index: 999;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- חיבור ל-Firebase ---
+# --- חיבור ל-Firebase (ללא שינוי) ---
 if not firebase_admin._apps:
     try:
         firebase_info = dict(st.secrets["firebase"])
@@ -55,23 +70,18 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 # --- עזרי תאריכים ---
-DAYS_HEBREW = {
-    'Sunday': 'ראשון', 'Monday': 'שני', 'Tuesday': 'שלישי', 
-    'Wednesday': 'רביעי', 'Thursday': 'חמישי', 'Friday': 'שישי', 'Saturday': 'שבת'
-}
-
+DAYS_HEBREW = {'Sunday': 'ראשון', 'Monday': 'שני', 'Tuesday': 'שלישי', 'Wednesday': 'רביעי', 'Thursday': 'חמישי', 'Friday': 'שישי', 'Saturday': 'שבת'}
 def get_day_name(date_str):
     try:
         date_obj = datetime.strptime(date_str, '%d/%m/%Y')
         return DAYS_HEBREW[date_obj.strftime('%A')]
     except: return ""
 
-# --- פונקציות בסיס נתונים (זהה לקוד הקודם) ---
+# --- פונקציות בסיס נתונים ---
 def get_balance_from_db():
     scores = {}
     docs = db.collection('employee_history').stream()
-    for doc in docs:
-        scores[doc.id] = doc.to_dict().get('total_shifts', 0)
+    for doc in docs: scores[doc.id] = doc.to_dict().get('total_shifts', 0)
     return scores
 
 def update_db_balance(schedule_dict):
@@ -125,11 +135,9 @@ if req_file and shifts_file:
                     temp_schedule[shift_key] = best
                     temp_assigned_today[date].add(best)
                     history_scores[best] = history_scores.get(best, 0) + 1
-        st.session_state.final_schedule = temp_schedule
-        st.session_state.assigned_today = temp_assigned_today
+        st.session_state.final_schedule = temp_schedule; st.session_state.assigned_today = temp_assigned_today
         st.rerun()
 
-    # --- יצירת הטורים עם כותרת דביקה ---
     st.divider()
     grid_cols = st.columns(len(dates))
     
@@ -137,11 +145,11 @@ if req_file and shifts_file:
         with grid_cols[i]:
             day_name = get_day_name(date_str)
             
-            # הזרקת ה-HTML של הכותרת הדביקה
+            # כותרת דביקה וקומפקטית
             st.markdown(f"""
                 <div class="sticky-header">
-                    <h3>יום {day_name}</h3>
-                    <h4>{date_str}</h4>
+                    <h5>יום {day_name}</h5>
+                    <p>{date_str}</p>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -153,38 +161,38 @@ if req_file and shifts_file:
                 with st.container(border=True):
                     st.write(f"**{s_row['משמרת']} | {s_row['תחנה']}**")
                     if is_cancelled:
-                        st.warning("🚫 מבוטלת")
+                        st.warning("🚫")
                         if st.button("שחזר", key=f"res_{shift_key}"):
                             st.session_state.cancelled_shifts.remove(shift_key); st.rerun()
                     elif current:
                         st.success(f"✅ {current}")
                         c1, c2 = st.columns(2)
                         with c1:
-                            if st.button("הסר", key=f"rem_{shift_key}"):
+                            if st.button("✖️", key=f"rem_{shift_key}", help="הסר עובד"):
                                 st.session_state.assigned_today[date_str].discard(current)
                                 st.session_state.final_schedule[shift_key] = None; st.rerun()
                         with c2:
-                            if st.button("בטל", key=f"can_{shift_key}"):
+                            if st.button("🚫", key=f"can_{shift_key}", help="בטל משמרת"):
                                 st.session_state.cancelled_shifts.add(shift_key)
                                 st.session_state.assigned_today[date_str].discard(current)
                                 st.session_state.final_schedule[shift_key] = None; st.rerun()
                     else:
-                        st.error("⚠️ חסר")
+                        st.error("⚠️")
                         pot = req_df[(req_df['תאריך מבוקש'] == date_str) & (req_df['משמרת'] == s_row['משמרת']) & (req_df['תחנה'] == s_row['תחנה'])]
                         avail = pot[~pot['שם'].isin(st.session_state.assigned_today.get(date_str, set()))]['שם'].tolist()
                         if avail:
-                            choice = st.selectbox("בחר:", ["-"] + avail, key=f"sel_{shift_key}")
+                            choice = st.selectbox("בחר:", ["-"] + avail, key=f"sel_{shift_key}", label_visibility="collapsed")
                             if choice != "-":
                                 st.session_state.final_schedule[shift_key] = choice
                                 st.session_state.assigned_today.setdefault(date_str, set()).add(choice); st.rerun()
-                        if st.button("🚫 בטל משמרת", key=f"bc_{shift_key}", use_container_width=True):
+                        if st.button("🚫 בטל", key=f"bc_{shift_key}", use_container_width=True):
                             st.session_state.cancelled_shifts.add(shift_key); st.rerun()
 
     if st.session_state.final_schedule:
         st.divider()
-        if st.button("💾 אשר ושמור בסיס נתונים", type="primary", use_container_width=True):
+        if st.button("💾 שמירה סופית ל-Firebase", type="primary", use_container_width=True):
             count = update_db_balance(st.session_state.final_schedule)
-            st.balloons(); st.success(f"נשמר! {count} משמרות עודכנו."); st.session_state.final_schedule = {}
+            st.balloons(); st.success(f"נשמר! {count} רשומות עודכנו."); st.session_state.final_schedule = {}
 
 else:
     st.info("אנא העלה קבצים בסרגל הצד.")
