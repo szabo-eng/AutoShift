@@ -5,52 +5,38 @@ from firebase_admin import credentials, firestore
 from datetime import datetime
 
 # --- הגדרות דף ---
-st.set_page_config(page_title="ניהול שיבוץ - תצוגה קומפקטית", layout="wide")
+st.set_page_config(page_title="ניהול שיבוץ - תצוגה מלאה", layout="wide")
 
-# --- הזרקת CSS ל-RTL וכותרות דביקות קטנות ---
+# --- הזרקת CSS ל-RTL וכותרות דביקות קומפקטיות ---
 st.markdown("""
     <style>
-    /* כיוון RTL כללי */
     [data-testid="stAppViewContainer"], [data-testid="stSidebar"] {
         direction: rtl;
         text-align: right;
     }
-
-    /* כותרת דביקה קומפקטית */
     .sticky-header {
         position: -webkit-sticky;
         position: sticky;
         top: 0;
-        background-color: #f8f9fa; /* אפור בהיר מאוד להפרדה */
+        background-color: #f8f9fa;
         z-index: 1000;
-        padding: 5px 2px; /* צמצום רווחים */
+        padding: 5px 2px;
         border-bottom: 2px solid #1f77b4;
         margin-bottom: 8px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         border-radius: 4px;
     }
-
-    /* הקטנת פונט בכותרת */
     .sticky-header h5 {
-        margin: 0;
-        text-align: center;
-        font-size: 0.95rem !important; /* פונט קטן וקריא */
-        font-weight: bold;
-        color: #1f77b4;
+        margin: 0; text-align: center; font-size: 0.95rem !important; font-weight: bold; color: #1f77b4;
     }
     .sticky-header p {
-        margin: 0;
-        text-align: center;
-        font-size: 0.8rem !important;
-        color: #555;
+        margin: 0; text-align: center; font-size: 0.8rem !important; color: #555;
     }
-
-    /* הקטנת רווחים בין אלמנטים ב-Streamlit */
-    [data-testid="stVerticalBlock"] {
-        gap: 0.5rem;
+    /* התאמת כרטיס המשמרת */
+    .shift-card-text {
+        font-size: 0.9rem;
+        line-height: 1.2;
     }
-    
-    /* הצמדת הכותרת מתחת לסרגל Streamlit */
     [data-testid="stVerticalBlock"] > div:has(div.sticky-header) {
         position: sticky;
         top: 2.85rem;
@@ -59,7 +45,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- חיבור ל-Firebase (ללא שינוי) ---
+# --- חיבור ל-Firebase ---
 if not firebase_admin._apps:
     try:
         firebase_info = dict(st.secrets["firebase"])
@@ -115,6 +101,8 @@ if req_file and shifts_file:
     shifts_template = pd.read_csv(shifts_file, encoding='utf-8-sig')
     req_df.columns = req_df.columns.str.strip()
     shifts_template.columns = shifts_template.columns.str.strip()
+    
+    # זיהוי עמודת אט"ן בקובץ REQ
     atan_col = [c for c in req_df.columns if "אט" in c and "מורשה" in c][0]
     dates = sorted(req_df['תאריך מבוקש'].unique())
 
@@ -125,8 +113,13 @@ if req_file and shifts_file:
             for idx, s_row in shifts_template.iterrows():
                 shift_key = f"{date}_{s_row['תחנה']}_{s_row['משמרת']}_{idx}"
                 if shift_key in st.session_state.cancelled_shifts: continue
+                
                 pot = req_df[(req_df['תאריך מבוקש'] == date) & (req_df['משמרת'] == s_row['משמרת']) & (req_df['תחנה'] == s_row['תחנה'])]
-                if "אט\"ן" in str(s_row['סוג תקן']): pot = pot[pot[atan_col] == 'כן']
+                
+                # בדיקת סוג תקן להתאמת אט"ן
+                if "אט\"ן" in str(s_row['סוג תקן']):
+                    pot = pot[pot[atan_col] == 'כן']
+                
                 pot = pot[~pot['שם'].isin(temp_assigned_today[date])]
                 if not pot.empty:
                     pot = pot.copy()
@@ -144,22 +137,20 @@ if req_file and shifts_file:
     for i, date_str in enumerate(dates):
         with grid_cols[i]:
             day_name = get_day_name(date_str)
-            
-            # כותרת דביקה וקומפקטית
-            st.markdown(f"""
-                <div class="sticky-header">
-                    <h5>יום {day_name}</h5>
-                    <p>{date_str}</p>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"""<div class="sticky-header"><h5>יום {day_name}</h5><p>{date_str}</p></div>""", unsafe_allow_html=True)
             
             for idx, s_row in shifts_template.iterrows():
                 shift_key = f"{date_str}_{s_row['תחנה']}_{s_row['משמרת']}_{idx}"
                 is_cancelled = shift_key in st.session_state.cancelled_shifts
                 current = st.session_state.final_schedule.get(shift_key)
                 
+                # חילוץ סוג תקן לתצוגה
+                v_type = s_row['סוג תקן'] if 'סוג תקן' in s_row else ""
+                
                 with st.container(border=True):
-                    st.write(f"**{s_row['משמרת']} | {s_row['תחנה']}**")
+                    # שורת תיאור משמרת כולל סוג תקן ותחנה
+                    st.markdown(f"<div class='shift-card-text'><b>{s_row['משמרת']} - {v_type}</b><br>{s_row['תחנה']}</div>", unsafe_allow_html=True)
+                    
                     if is_cancelled:
                         st.warning("🚫")
                         if st.button("שחזר", key=f"res_{shift_key}"):
@@ -179,6 +170,9 @@ if req_file and shifts_file:
                     else:
                         st.error("⚠️")
                         pot = req_df[(req_df['תאריך מבוקש'] == date_str) & (req_df['משמרת'] == s_row['משמרת']) & (req_df['תחנה'] == s_row['תחנה'])]
+                        if "אט\"ן" in str(v_type):
+                            pot = pot[pot[atan_col] == 'כן']
+                        
                         avail = pot[~pot['שם'].isin(st.session_state.assigned_today.get(date_str, set()))]['שם'].tolist()
                         if avail:
                             choice = st.selectbox("בחר:", ["-"] + avail, key=f"sel_{shift_key}", label_visibility="collapsed")
