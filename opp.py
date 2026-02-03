@@ -123,7 +123,7 @@ def show_selection_dialog(shift_key, date_str, station, shift_name, v_type, req_
 
         selected_label = st.radio("בחר עובד:", [opt[0] for opt in options], index=None, key=f"rad_{shift_key}")
 
-        if st.button("אשר שיבוץ", type="primary", width=True):
+        if st.button("אשר שיבוץ", type="primary", use_container_width=True):
             if selected_label:
                 selected_name = next(opt[1] for opt in options if opt[0] == selected_label)
                 st.session_state.final_schedule[shift_key] = selected_name
@@ -140,7 +140,7 @@ with st.sidebar:
     st.header("⚙️ נתונים")
     req_file = st.file_uploader("העלה REQ.csv", type=['csv'])
     shifts_file = st.file_uploader("העלה SHIFTS.csv", type=['csv'])
-    if st.button("🧹 איפוס לוח", width=True):
+    if st.button("🧹 איפוס לוח", use_container_width=True):
         st.session_state.final_schedule = {}; st.session_state.assigned_today = {}; st.session_state.cancelled_shifts = set()
         st.rerun()
 
@@ -158,7 +158,7 @@ if req_file and shifts_file:
     history_scores = get_balance_from_db()
 
     # --- שיבוץ אוטומטי ---
-    if st.button("🪄 הפעל שיבוץ אוטומטי", type="primary", width=True):
+    if st.button("🪄 הפעל שיבוץ אוטומטי", type="primary", use_container_width=True):
         temp_schedule = {}; temp_assigned_today = {d: set() for d in dates}
         current_scores = history_scores.copy()
         for date in dates:
@@ -198,15 +198,15 @@ if req_file and shifts_file:
                             st.session_state.cancelled_shifts.remove(shift_key); st.rerun()
                     elif current:
                         st.success(f"✅ {current}")
-                        if st.button("✖️ הסר", key=f"rem_{shift_key}", width=True):
+                        if st.button("✖️ הסר", key=f"rem_{shift_key}", use_container_width=True):
                             st.session_state.assigned_today[date_str].discard(current)
                             st.session_state.final_schedule[shift_key] = None; st.rerun()
                     else:
                         st.error("⚠️ חסר")
-                        if st.button("➕ בחר", key=f"btn_{shift_key}", width=True):
+                        if st.button("➕ בחר", key=f"btn_{shift_key}", use_container_width=True):
                             show_selection_dialog(shift_key, date_str, s_row['תחנה'], s_row['משמרת'], s_row['סוג תקן'], req_df, history_scores, atan_col, hours_col)
                         
-                        if st.button("🚫 בטל", key=f"bc_{shift_key}", width=True):
+                        if st.button("🚫 בטל", key=f"bc_{shift_key}", use_container_width=True):
                             st.session_state.cancelled_shifts.add(shift_key); st.rerun()
 
     # --- טבלת ריכוז והשוואה ---
@@ -254,15 +254,14 @@ if req_file and shifts_file:
         # הצגת הטבלה עם עיצוב מותנה
         st.dataframe(
             summary_df.style.apply(highlight_table_rows, axis=1), 
-            width=True,
+            use_container_width=True,
             hide_index=True,
             height=400
         )
 
     if st.session_state.final_schedule:
         st.divider()
-        if st.button("💾 שמירה סופית ועדכון היסטוריה", type="primary", width=True):
+        if st.button("💾 שמירה סופית ועדכון היסטוריה", type="primary", use_container_width=True):
             st.balloons(); st.success("הנתונים נשמרו בהצלחה!"); st.session_state.final_schedule = {}
 else:
     st.info("אנא העלה קבצים בסרגל הצד.")
-
