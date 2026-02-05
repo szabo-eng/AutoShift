@@ -4,7 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
 
-# --- 1. הגדרות דף ועיצוב (Sticky Header & Updated Cards) ---
+# --- 1. הגדרות דף ועיצוב (Sticky Header & Cards) ---
 st.set_page_config(page_title="מערכת שיבוץ - חוקים קשיחים 2026", layout="wide")
 
 st.markdown("""
@@ -15,7 +15,7 @@ st.markdown("""
     /* קיבוע כותרות התאריכים */
     div[data-testid="stVerticalBlock"] > div:has(div.sticky-date-header) {
         position: sticky;
-        top: 2.8rem;
+        top: 2.85rem;
         z-index: 1000;
         background-color: white;
     }
@@ -33,7 +33,7 @@ st.markdown("""
     .day-name { font-weight: bold; color: #1f77b4; font-size: 1.1rem; display: block; }
     .date-val { font-size: 0.85rem; color: #666; }
 
-    /* כרטיסי משמרות מעודכנים */
+    /* כרטיסי משמרות */
     .shift-card { 
         padding: 12px; border-radius: 8px; border-right: 10px solid #ccc; 
         margin-bottom: 8px; box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
@@ -75,34 +75,39 @@ def get_balance():
 def convert_to_csv(df):
     return df.to_csv(index=False).encode('utf-8-sig')
 
-# --- 4. דיאלוג בחירה ידנית ---
-@st.dialog("בחירת עובד זמין", width="large")
+# --- 4. דיאלוג בחירה ידנית משופר ---
+@st.dialog("בחירת עובד זמין (סינון חכם)", width="large")
 def show_manual_picker(shift_key, date_str, s_row, req_df, balance):
-    st.write(f"### {s_row['משמרת']} {s_row['סוג תקן']} {s_row['תחנה']}")
+    st.write(f"### שיבוץ ל: {s_row['משמרת']} {s_row['סוג תקן']} {s_row['תחנה']}")
     
-    # חוקי סף: התאמת בקשה מלאה
-    avail = req_df[
-        (req_df['תאריך מבוקש'] == date_str) & 
-        (req_df['משמרת'] == s_row['משמרת']) & 
-        (req_df['תחנה'] == s_row['תחנה'])
-    ].copy()
+    # 1. הצגת כל מי שהגיש משמרת לאותו יום (ללא סינון תחנה/משמרת ספציפית)
+    avail = req_df[req_df['תאריך מבוקש'] == date_str].copy()
     
+    # 2. הסרת עובדים שכבר משובצים למשהו אחר באותו יום
     already_working = st.session_state.assigned_today.get(date_str, set())
     avail = avail[~avail['שם'].isin(already_working)]
     
+    # 3. סינון אט"ן (חובה) - רק אם המשמרת היא אט"ן
     if "אט" in str(s_row['סוג תקן']):
         atan_col = [c for c in req_df.columns if "אט" in c and "מורשה" in c][0]
         avail = avail[avail[atan_col] == 'כן']
     
     if avail.empty:
-        st.warning("אין מועמדים מתאימים לפי חוקי הסף.")
+        st.warning("אין מועמדים זמינים העומדים בתנאי הסף ליום זה.")
     else:
+        # הוספת מאזן מה-DB לצורך שקיפות
         avail['bal'] = avail['שם'].map(lambda x: balance.get(x, 0))
         avail = avail.sort_values('bal')
-        options = {f"{r['שם']} (מאזן: {int(r['bal'])})": r['שם'] for _, r in avail.iterrows()}
-        choice = st.radio("בחר עובד:", list(options.keys()), index=None)
         
-        if st.button("אישור שיבוץ", width='stretch', type="primary"):
+        # יצירת תצוגת הבחירה: שם | תחנה שביקש | שעות | שנתון | מאזן
+        # נניח שמות העמודות ב-CSV הם: 'שם', 'תחנה', 'שעות', 'שנתון'
+        def format_label(r):
+            return f"👤 {r['שם']} | 📍 ביקש: {r['תחנה']} | ⏰ {r['שעות']} | 🎓 שנתון: {r['שנתון']} | 📊 מאזן: {int(r['bal'])}"
+
+        options = {format_label(r): r['שם'] for _, r in avail.iterrows()}
+        choice = st.radio("בחר עובד מהרשימה המורחבת:", list(options.keys()), index=None)
+        
+        if st.button("אשר שיבוץ", width='stretch', type="primary"):
             if choice:
                 name = options[choice]
                 st.session_state.final_schedule[shift_key] = name
@@ -144,6 +149,7 @@ if req_f and shi_f:
                 s_key = f"{d}_{s['תחנה']}_{s['משמרת']}_{idx}"
                 if s_key in st.session_state.cancelled_shifts: continue
                 
+                # חוקי סף אוטומטיים (תאריך+משמרת+תחנה)
                 pot = req_df[(req_df['תאריך מבוקש'] == d) & (req_df['משמרת'] == s['משמרת']) & 
                              (req_df['תחנה'] == s['תחנה']) & (~req_df['שם'].isin(temp_assigned_today[d]))]
                 
@@ -165,7 +171,7 @@ if req_f and shi_f:
 
     st.divider()
 
-    # --- 8. גריד שיבוץ (מבנה משמרת חדש) ---
+    # --- 8. גריד שיבוץ ---
     cols = st.columns(len(dates))
     for i, d_str in enumerate(dates):
         with cols[i]:
@@ -180,10 +186,8 @@ if req_f and shi_f:
                 s_key = f"{d_str}_{s['תחנה']}_{s['משמרת']}_{idx}"
                 assigned = st.session_state.final_schedule.get(s_key)
                 cancelled = s_key in st.session_state.cancelled_shifts
-                
                 style = "type-atan" if "אט" in str(s['סוג תקן']) else "type-standard"
                 
-                # תצוגת משמרת: משמרת + סוג תקן + תחנה
                 st.markdown(f"""
                     <div class="shift-card {style}">
                         <div class="shift-info">{s['משמרת']} {s['סוג תקן']} {s['תחנה']}</div>
