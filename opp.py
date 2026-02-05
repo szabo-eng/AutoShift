@@ -4,7 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
 
-# --- 1. הגדרות דף ועיצוב (Sticky Header FIX) ---
+# --- 1. הגדרות דף ועיצוב (Sticky Header & Updated Cards) ---
 st.set_page_config(page_title="מערכת שיבוץ - חוקים קשיחים 2026", layout="wide")
 
 st.markdown("""
@@ -12,7 +12,7 @@ st.markdown("""
     /* הגדרות RTL */
     [data-testid="stAppViewContainer"], [data-testid="stSidebar"], .main { direction: rtl; text-align: right; }
     
-    /* תיקון קריטי לקיבוע כותרות ב-Streamlit */
+    /* קיבוע כותרות התאריכים */
     div[data-testid="stVerticalBlock"] > div:has(div.sticky-date-header) {
         position: sticky;
         top: 2.8rem;
@@ -22,25 +22,29 @@ st.markdown("""
 
     .sticky-date-header {
         background-color: #ffffff;
-        padding: 15px;
+        padding: 12px;
         border-bottom: 4px solid #1f77b4;
         text-align: center;
         border-radius: 8px 8px 0 0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 5px;
     }
     
-    .day-name { font-weight: bold; color: #1f77b4; font-size: 1.2rem; display: block; }
-    .date-val { font-size: 0.9rem; color: #666; }
+    .day-name { font-weight: bold; color: #1f77b4; font-size: 1.1rem; display: block; }
+    .date-val { font-size: 0.85rem; color: #666; }
 
-    /* כרטיסי משמרות */
+    /* כרטיסי משמרות מעודכנים */
     .shift-card { 
-        padding: 10px; border-radius: 8px; border-right: 10px solid #ccc; 
+        padding: 12px; border-radius: 8px; border-right: 10px solid #ccc; 
         margin-bottom: 8px; box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+        line-height: 1.4;
     }
     .type-atan { border-right-color: #FFA500; background-color: #FFF8EE; }
     .type-standard { border-right-color: #ADD8E6; background-color: #F0F8FF; }
-
-    [data-testid="stVerticalBlock"] { gap: 0.3rem !important; }
+    
+    .shift-info { font-size: 0.95rem; font-weight: bold; color: #333; }
+    
+    [data-testid="stVerticalBlock"] { gap: 0.2rem !important; }
     div[role="dialog"] { direction: rtl; text-align: right; }
     </style>
     """, unsafe_allow_html=True)
@@ -74,7 +78,7 @@ def convert_to_csv(df):
 # --- 4. דיאלוג בחירה ידנית ---
 @st.dialog("בחירת עובד זמין", width="large")
 def show_manual_picker(shift_key, date_str, s_row, req_df, balance):
-    st.write(f"### {s_row['משמרת']} | {s_row['תחנה']}")
+    st.write(f"### {s_row['משמרת']} {s_row['סוג תקן']} {s_row['תחנה']}")
     
     # חוקי סף: התאמת בקשה מלאה
     avail = req_df[
@@ -91,7 +95,7 @@ def show_manual_picker(shift_key, date_str, s_row, req_df, balance):
         avail = avail[avail[atan_col] == 'כן']
     
     if avail.empty:
-        st.warning("אין מועמדים מתאימים.")
+        st.warning("אין מועמדים מתאימים לפי חוקי הסף.")
     else:
         avail['bal'] = avail['שם'].map(lambda x: balance.get(x, 0))
         avail = avail.sort_values('bal')
@@ -115,10 +119,10 @@ with st.sidebar:
     st.header("⚙️ נתונים")
     req_f = st.file_uploader("REQ.csv", type=['csv'])
     shi_f = st.file_uploader("SHIFTS.csv", type=['csv'])
-    if st.button("🧹 איפוס", width='stretch'):
+    if st.button("🧹 איפוס הכל", width='stretch'):
         st.session_state.clear(); st.rerun()
 
-st.title("🛡️ שיבוץ מבצעי 2026")
+st.title("📅 שיבוץ מבצעי חכם")
 
 if req_f and shi_f:
     req_df = pd.read_csv(req_f, encoding='utf-8-sig')
@@ -129,8 +133,8 @@ if req_f and shi_f:
     dates = sorted(req_df['תאריך מבוקש'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
     global_balance = get_balance()
 
-    # --- 7. אלגוריתם אוטומטי ---
-    if st.button("🪄 שיבוץ אוטומטי הוגן", type="primary", width='stretch'):
+    # --- 7. אלגוריתם אוטומטי (הוגנות דינמית) ---
+    if st.button("🪄 הפעל שיבוץ אוטומטי", type="primary", width='stretch'):
         temp_schedule = {}
         temp_assigned_today = {d: set() for d in dates}
         running_balance = global_balance.copy()
@@ -161,11 +165,10 @@ if req_f and shi_f:
 
     st.divider()
 
-    # --- 8. גריד שיבוץ (עם התיקון ל-Sticky) ---
+    # --- 8. גריד שיבוץ (מבנה משמרת חדש) ---
     cols = st.columns(len(dates))
     for i, d_str in enumerate(dates):
         with cols[i]:
-            # שימוש ב-div ייעודי שה-CSS מזהה לצורך Sticky
             st.markdown(f"""
                 <div class="sticky-date-header">
                     <span class="day-name">{get_day_name(d_str)}</span>
@@ -177,9 +180,15 @@ if req_f and shi_f:
                 s_key = f"{d_str}_{s['תחנה']}_{s['משמרת']}_{idx}"
                 assigned = st.session_state.final_schedule.get(s_key)
                 cancelled = s_key in st.session_state.cancelled_shifts
+                
                 style = "type-atan" if "אט" in str(s['סוג תקן']) else "type-standard"
                 
-                st.markdown(f'<div class="shift-card {style}"><div class="shift-title">{s["משמרת"]}</div><div class="shift-station">{s["תחנה"]}</div></div>', unsafe_allow_html=True)
+                # תצוגת משמרת: משמרת + סוג תקן + תחנה
+                st.markdown(f"""
+                    <div class="shift-card {style}">
+                        <div class="shift-info">{s['משמרת']} {s['סוג תקן']} {s['תחנה']}</div>
+                    </div>
+                """, unsafe_allow_html=True)
                 
                 if cancelled:
                     st.caption("🚫 מבוטל")
@@ -211,17 +220,18 @@ if req_f and shi_f:
             summary.append({"תאריך": d, "יום": get_day_name(d), "משמרת": s['משמרת'], "תחנה": s['תחנה'], "עובד": assigned, "סטטוס": status})
     
     if summary:
+        st.subheader("📊 סיכום וייצוא")
         df_sum = pd.DataFrame(summary)
         st.dataframe(df_sum, width='stretch', hide_index=True)
-        st.download_button("📥 הורד סיכום (Excel)", data=convert_to_csv(df_sum), file_name="schedule.csv", mime="text/csv", width='stretch')
+        st.download_button("📥 הורד סיכום שבועי", data=convert_to_csv(df_sum), file_name="schedule.csv", mime="text/csv", width='stretch')
 
-    # --- 10. נעילה ---
+    # --- 10. נעילה סופית ---
     st.divider()
-    if st.button("💾 אישור סופי ונעילה", type="primary", width='stretch'):
+    if st.button("💾 אישור סופי ונעילת לוח", type="primary", width='stretch'):
         batch = db.batch()
         for name in [v for k, v in st.session_state.final_schedule.items() if v and "⚠️" not in str(v)]:
             batch.set(db.collection('employee_history').document(name), {'total_shifts': firestore.Increment(1)}, merge=True)
         batch.commit()
-        st.balloons(); st.success("ננעל בהצלחה!")
+        st.balloons(); st.success("הלוח ננעל וההיסטוריה עודכנה!")
 else:
-    st.info("העלה קבצים בסרגל הצד.")
+    st.info("אנא העלה קבצים בסרגל הצד.")
