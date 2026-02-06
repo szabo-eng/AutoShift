@@ -3,6 +3,7 @@ import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
+import io
 
 # --- 1. הגדרות דף ועיצוב (Sticky Header & Cards) ---
 st.set_page_config(page_title="מערכת שיבוץ - חוקים קשיחים 2026", layout="wide")
@@ -72,40 +73,34 @@ def get_balance():
     except: pass
     return scores
 
-def convert_to_csv(df):
+def convert_df_to_csv(df):
+    # utf-8-sig חיוני כדי שאקסל יזהה עברית
     return df.to_csv(index=False).encode('utf-8-sig')
 
-# --- 4. דיאלוג בחירה ידנית משופר ---
+# --- 4. דיאלוג בחירה ידנית ---
 @st.dialog("בחירת עובד זמין (סינון חכם)", width="large")
 def show_manual_picker(shift_key, date_str, s_row, req_df, balance):
     st.write(f"### שיבוץ ל: {s_row['משמרת']} {s_row['סוג תקן']} {s_row['תחנה']}")
     
-    # 1. הצגת כל מי שהגיש משמרת לאותו יום (ללא סינון תחנה/משמרת ספציפית)
     avail = req_df[req_df['תאריך מבוקש'] == date_str].copy()
-    
-    # 2. הסרת עובדים שכבר משובצים למשהו אחר באותו יום
     already_working = st.session_state.assigned_today.get(date_str, set())
     avail = avail[~avail['שם'].isin(already_working)]
     
-    # 3. סינון אט"ן (חובה) - רק אם המשמרת היא אט"ן
     if "אט" in str(s_row['סוג תקן']):
         atan_col = [c for c in req_df.columns if "אט" in c and "מורשה" in c][0]
         avail = avail[avail[atan_col] == 'כן']
     
     if avail.empty:
-        st.warning("אין מועמדים זמינים העומדים בתנאי הסף ליום זה.")
+        st.warning("אין מועמדים זמינים.")
     else:
-        # הוספת מאזן מה-DB לצורך שקיפות
         avail['bal'] = avail['שם'].map(lambda x: balance.get(x, 0))
         avail = avail.sort_values('bal')
         
-        # יצירת תצוגת הבחירה: שם | תחנה שביקש | שעות | שנתון | מאזן
-        # נניח שמות העמודות ב-CSV הם: 'שם', 'תחנה', 'שעות', 'שנתון'
         def format_label(r):
             return f"👤 {r['שם']} | 📍 ביקש: {r['תחנה']} | ⏰ {r['שעות']} | 🎓 שנתון: {r['שנתון']} | 📊 מאזן: {int(r['bal'])}"
 
         options = {format_label(r): r['שם'] for _, r in avail.iterrows()}
-        choice = st.radio("בחר עובד מהרשימה המורחבת:", list(options.keys()), index=None)
+        choice = st.radio("בחר עובד:", list(options.keys()), index=None)
         
         if st.button("אשר שיבוץ", width='stretch', type="primary"):
             if choice:
@@ -127,7 +122,7 @@ with st.sidebar:
     if st.button("🧹 איפוס הכל", width='stretch'):
         st.session_state.clear(); st.rerun()
 
-st.title("📅 שיבוץ מבצעי חכם")
+st.title("📅 מערכת שיבוץ מבצעית 2026")
 
 if req_f and shi_f:
     req_df = pd.read_csv(req_f, encoding='utf-8-sig')
@@ -138,7 +133,7 @@ if req_f and shi_f:
     dates = sorted(req_df['תאריך מבוקש'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
     global_balance = get_balance()
 
-    # --- 7. אלגוריתם אוטומטי (הוגנות דינמית) ---
+    # --- 7. אלגוריתם אוטומטי ---
     if st.button("🪄 הפעל שיבוץ אוטומטי", type="primary", width='stretch'):
         temp_schedule = {}
         temp_assigned_today = {d: set() for d in dates}
@@ -149,7 +144,6 @@ if req_f and shi_f:
                 s_key = f"{d}_{s['תחנה']}_{s['משמרת']}_{idx}"
                 if s_key in st.session_state.cancelled_shifts: continue
                 
-                # חוקי סף אוטומטיים (תאריך+משמרת+תחנה)
                 pot = req_df[(req_df['תאריך מבוקש'] == d) & (req_df['משמרת'] == s['משמרת']) & 
                              (req_df['תחנה'] == s['תחנה']) & (~req_df['שם'].isin(temp_assigned_today[d]))]
                 
@@ -211,9 +205,12 @@ if req_f and shi_f:
                     if c2.button("🚫", key=f"can_{s_key}", width='stretch'):
                         st.session_state.cancelled_shifts.add(s_key); st.rerun()
 
-    # --- 9. סיכום וייצוא ---
+    # --- 9. ייצוא נתונים ואקסל ---
     st.divider()
-    summary = []
+    st.subheader("📊 ייצוא דוחות לאקסל")
+    
+    # הכנת דאטה לסיכום שבועי
+    summary_data = []
     for d in dates:
         for idx, s in shi_df.iterrows():
             s_key = f"{d}_{s['תחנה']}_{s['משמרת']}_{idx}"
@@ -221,13 +218,45 @@ if req_f and shi_f:
             status = "תקין"
             if s_key in st.session_state.cancelled_shifts: status, assigned = "בוטל", "🚫"
             elif not assigned: status, assigned = "חסר", "⚠️ חסר"
-            summary.append({"תאריך": d, "יום": get_day_name(d), "משמרת": s['משמרת'], "תחנה": s['תחנה'], "עובד": assigned, "סטטוס": status})
+            summary_data.append({
+                "תאריך": d, "יום": get_day_name(d), "משמרת": s['משמרת'], 
+                "סוג תקן": s['סוג תקן'], "תחנה": s['תחנה'], "עובד משובץ": assigned, "סטטוס": status
+            })
     
-    if summary:
-        st.subheader("📊 סיכום וייצוא")
-        df_sum = pd.DataFrame(summary)
-        st.dataframe(df_sum, width='stretch', hide_index=True)
-        st.download_button("📥 הורד סיכום שבועי", data=convert_to_csv(df_sum), file_name="schedule.csv", mime="text/csv", width='stretch')
+    df_weekly = pd.DataFrame(summary_data)
+    
+    col_exp1, col_exp2 = st.columns(2)
+    
+    with col_exp1:
+        st.write("1) סיכום הלוח הנוכחי")
+        st.download_button(
+            label="📥 הורד סיכום שבועי",
+            data=convert_df_to_csv(df_weekly),
+            file_name=f"weekly_schedule_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv",
+            width='stretch'
+        )
+        
+    with col_exp2:
+        st.write("2) מאזן משמרות מצטבר (מכל הזמנים)")
+        if st.button("🔍 טען מאזן מה-Database", width='stretch'):
+            # שליפה ישירה מ-Firebase
+            all_stats = []
+            for doc in db.collection('employee_history').stream():
+                data = doc.to_dict()
+                all_stats.append({"שם עובד": doc.id, "סה\"כ משמרות": data.get('total_shifts', 0)})
+            
+            if all_stats:
+                df_global = pd.DataFrame(all_stats).sort_values("סה\"כ משמרות", ascending=False)
+                st.download_button(
+                    label="📥 הורד מאזן כללי",
+                    data=convert_df_to_csv(df_global),
+                    file_name="global_employee_stats.csv",
+                    mime="text/csv",
+                    width='stretch'
+                )
+            else:
+                st.warning("לא נמצאו נתונים ב-Database.")
 
     # --- 10. נעילה סופית ---
     st.divider()
