@@ -379,6 +379,103 @@ def get_balance():
         st.warning(f"⚠️ לא ניתן לטעון מאזן: {str(e)}")
     return scores
 
+# --- אלגוריתם שיבוץ ---
+def auto_assign(dates, shi_df, req_df, balance):
+    """שיבוץ אוטומטי של כל המשמרות"""
+    temp_schedule = {}
+    temp_assigned_today = {d: set() for d in dates}
+    running_balance = balance.copy()
+    atan_col = get_atan_column(req_df)
+    
+    for date_str in dates:
+        for idx, shift_row in shi_df.iterrows():
+            shift_key = f"{date_str}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
+            
+            if shift_key in st.session_state.cancelled_shifts:
+                continue
+            
+            potential = req_df[
+                (req_df['תאריך מבוקש'] == date_str) &
+                (req_df['משמרת'] == shift_row['משמרת']) &
+                (req_df['תחנה'] == shift_row['תחנה']) &
+                (~req_df['שם'].isin(temp_assigned_today[date_str]))
+            ].copy()
+            
+            if "אט" in str(shift_row['סוג תקן']) and atan_col:
+                potential = potential[potential[atan_col] == 'כן']
+            
+            if not potential.empty:
+                potential['score'] = potential['שם'].map(lambda x: running_balance.get(x, 0))
+                best = potential.sort_values('score').iloc[0]['שם']
+                temp_schedule[shift_key] = best
+                temp_assigned_today[date_str].add(best)
+                running_balance[best] = running_balance.get(best, 0) + 1
+    
+    return temp_schedule, temp_assigned_today
+
+# --- דיאלוג שיבוץ ---
+@st.dialog("שיבוץ עובד למשמרת")
+def show_assignment_dialog(shift_key, date_str, station, shift_type, req_df, balance):
+    """דיאלוג לבחירת עובד למשמרת"""
+    st.markdown(f"### {get_day_name(date_str)} - {date_str}")
+    st.write(f"**תחנה:** {station} | **משמרת:** {shift_type}")
+    
+    # מצא מועמדים זמינים
+    already_working = st.session_state.assigned_today.get(date_str, set())
+    candidates = req_df[
+        (req_df['תאריך מבוקש'] == date_str) &
+        (req_df['משמרת'] == shift_type) &
+        (req_df['תחנה'] == station) &
+        (~req_df['שם'].isin(already_working))
+    ].copy()
+    
+    # סינון לפי אט"ן אם נדרש
+    shift_row = None
+    for idx, s in st.session_state.current_shifts_df.iterrows():
+        test_key = f"{date_str}_{s['תחנה']}_{s['משמרת']}_{idx}"
+        if test_key == shift_key:
+            shift_row = s
+            break
+    
+    if shift_row is not None and "אט" in str(shift_row['סוג תקן']):
+        atan_col = get_atan_column(req_df)
+        if atan_col:
+            candidates = candidates[candidates[atan_col] == 'כן']
+    
+    if candidates.empty:
+        st.warning("😕 אין מועמדים פנויים למשמרת זו")
+        if st.button("סגור", type="secondary", use_container_width=True):
+            st.rerun()
+    else:
+        # הוסף מאזן ומיין
+        candidates['balance'] = candidates['שם'].map(lambda x: balance.get(x, 0))
+        candidates = candidates.sort_values('balance')
+        
+        st.markdown("#### בחר עובד:")
+        st.caption("העובדים מסודרים לפי מאזן משמרות (מי שעבד הכי פחות)")
+        
+        # יצירת אפשרויות בחירה
+        selected = st.radio(
+            "עובדים זמינים:",
+            options=candidates['שם'].tolist(),
+            format_func=lambda x: f"👤 {x} (מאזן: {balance.get(x, 0)} משמרות)",
+            key=f"radio_{shift_key}"
+        )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ אישור", type="primary", use_container_width=True):
+                st.session_state.final_schedule[shift_key] = selected
+                if date_str not in st.session_state.assigned_today:
+                    st.session_state.assigned_today[date_str] = set()
+                st.session_state.assigned_today[date_str].add(selected)
+                st.success(f"✅ {selected} שובץ/ה בהצלחה!")
+                st.rerun()
+        
+        with col2:
+            if st.button("❌ ביטול", type="secondary", use_container_width=True):
+                st.rerun()
+
 # --- Session State ---
 if 'final_schedule' not in st.session_state:
     st.session_state.final_schedule = {}
@@ -386,6 +483,10 @@ if 'assigned_today' not in st.session_state:
     st.session_state.assigned_today = {}
 if 'cancelled_shifts' not in st.session_state:
     st.session_state.cancelled_shifts = set()
+if 'current_shifts_df' not in st.session_state:
+    st.session_state.current_shifts_df = None
+if 'current_req_df' not in st.session_state:
+    st.session_state.current_req_df = None
 
 # --- Sidebar ---
 with st.sidebar:
@@ -461,35 +562,16 @@ if req_file and shi_file:
         dates = sorted(req_df['תאריך מבוקש'].unique(), key=parse_date_safe)
         balance = get_balance()
         
+        # שמירת DataFrames ב-session state לשימוש בדיאלוג
+        st.session_state.current_shifts_df = shi_df
+        st.session_state.current_req_df = req_df
+        
         # שיבוץ אוטומטי
         if st.session_state.get('trigger_auto'):
             with st.spinner('מבצע שיבוץ אוטומטי...'):
-                st.session_state.final_schedule = {}
-                st.session_state.assigned_today = {d: set() for d in dates}
-                running_balance = balance.copy()
-                atan_col = get_atan_column(req_df)
-                
-                for date_str in dates:
-                    for idx, shift_row in shi_df.iterrows():
-                        shift_key = f"{date_str}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
-                        
-                        potential = req_df[
-                            (req_df['תאריך מבוקש'] == date_str) &
-                            (req_df['משמרת'] == shift_row['משמרת']) &
-                            (req_df['תחנה'] == shift_row['תחנה']) &
-                            (~req_df['שם'].isin(st.session_state.assigned_today[date_str]))
-                        ].copy()
-                        
-                        if "אט" in str(shift_row['סוג תקן']) and atan_col:
-                            potential = potential[potential[atan_col] == 'כן']
-                        
-                        if not potential.empty:
-                            potential['score'] = potential['שם'].map(lambda x: running_balance.get(x, 0))
-                            best = potential.sort_values('score').iloc[0]['שם']
-                            st.session_state.final_schedule[shift_key] = best
-                            st.session_state.assigned_today[date_str].add(best)
-                            running_balance[best] = running_balance.get(best, 0) + 1
-                
+                temp_schedule, temp_assigned = auto_assign(dates, shi_df, req_df, balance)
+                st.session_state.final_schedule = temp_schedule
+                st.session_state.assigned_today = temp_assigned
                 st.session_state.trigger_auto = False
             st.success(f"✅ שיבוץ אוטומטי הושלם! {len(st.session_state.final_schedule)} משמרות שובצו")
             st.rerun()
