@@ -129,19 +129,48 @@ def load_custom_css():
         color: #7f8c8d !important;
     }
     
-    /* עמודות */
+    /* עמודות - מאפשר גלילה עם כותרת קבועה */
     [data-testid="column"] {
         background: white;
-        padding: 1.5rem;
         border-radius: 16px;
         box-shadow: 0 4px 16px rgba(26, 77, 122, 0.08);
         margin: 0.5rem;
         transition: all 0.3s ease;
+        overflow: visible;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
     }
     
     [data-testid="column"]:hover {
-        transform: translateY(-5px);
         box-shadow: 0 8px 24px rgba(26, 77, 122, 0.15);
+    }
+    
+    /* אזור הגלילה של המשמרות */
+    .shifts-scroll-container {
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0 1rem 1rem 1rem;
+        flex: 1;
+    }
+    
+    /* סגנון סרגל הגלילה */
+    .shifts-scroll-container::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .shifts-scroll-container::-webkit-scrollbar-track {
+        background: #f4f1ed;
+        border-radius: 4px;
+    }
+    
+    .shifts-scroll-container::-webkit-scrollbar-thumb {
+        background: #1a4d7a;
+        border-radius: 4px;
+    }
+    
+    .shifts-scroll-container::-webkit-scrollbar-thumb:hover {
+        background: #2e6ba8;
     }
     
     /* הודעות */
@@ -254,15 +283,17 @@ def load_custom_css():
         gap: 0.5rem;
     }
     
-    /* כותרת יום */
+    /* כותרת יום - קבועה בגלילה */
     .day-header {
         background: linear-gradient(135deg, #1a4d7a 0%, #2e6ba8 100%);
         color: white;
         padding: 1.5rem;
-        border-radius: 12px;
+        border-radius: 12px 12px 0 0;
         text-align: center;
-        margin-bottom: 1rem;
         box-shadow: 0 4px 16px rgba(26, 77, 122, 0.3);
+        position: sticky;
+        top: 0;
+        z-index: 100;
     }
     
     .day-name {
@@ -275,6 +306,11 @@ def load_custom_css():
     .day-date {
         font-size: 0.95rem;
         opacity: 0.9;
+    }
+    
+    /* מיכל המשמרות עם רווח מהכותרת */
+    .shifts-container {
+        padding-top: 1rem;
     }
     
     /* Expander */
@@ -603,13 +639,16 @@ if req_file and shi_file:
         
         for i, date_str in enumerate(dates[:7]):
             with cols[i]:
-                # כותרת יום
+                # כותרת יום - תישאר קבועה
                 st.markdown(f"""
                 <div class="day-header">
                     <div class="day-name">{get_day_name(date_str)}</div>
                     <div class="day-date">{date_str}</div>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # פתיחת מיכל גלילה
+                st.markdown('<div class="shifts-scroll-container">', unsafe_allow_html=True)
                 
                 # משמרות היום
                 for idx, shift_row in shi_df.iterrows():
@@ -650,6 +689,9 @@ if req_file and shi_file:
                             if st.button("🚫", key=f"cancel_{shift_key}", use_container_width=True):
                                 st.session_state.cancelled_shifts.add(shift_key)
                                 st.rerun()
+                
+                # סגירת מיכל הגלילה
+                st.markdown('</div>', unsafe_allow_html=True)
         
     except Exception as e:
         st.error(f"❌ שגיאה: {str(e)}")
