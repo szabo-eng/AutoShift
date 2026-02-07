@@ -301,11 +301,18 @@ def load_custom_css():
         padding: 1.5rem;
         border-radius: 12px 12px 0 0;
         text-align: center;
-        box-shadow: 0 2px 8px rgba(26, 77, 122, 0.3);
+        box-shadow: 0 4px 16px rgba(26, 77, 122, 0.4);
         position: sticky;
         top: 0;
-        z-index: 10;
+        z-index: 999 !important;
         margin: 0 !important;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+    
+    /* צל מוגבר בגלילה */
+    [data-testid="column"] > div:not(:has(.day-header:first-child)) .day-header {
+        box-shadow: 0 6px 24px rgba(26, 77, 122, 0.5);
     }
     
     .day-name {
@@ -651,7 +658,7 @@ if req_file and shi_file:
         
         for i, date_str in enumerate(dates[:7]):
             with cols[i]:
-                # כותרת יום - תישאר קבועה
+                # כותרת יום - תישאר קבועה בגלילה
                 st.markdown(f"""
                 <div class="day-header">
                     <div class="day-name">{get_day_name(date_str)}</div>
