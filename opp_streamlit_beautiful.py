@@ -136,41 +136,41 @@ def load_custom_css():
         box-shadow: 0 4px 16px rgba(26, 77, 122, 0.08);
         margin: 0.5rem;
         transition: all 0.3s ease;
-        overflow: visible;
-        max-height: 80vh;
+        overflow: hidden !important;
+        max-height: 85vh;
         display: flex;
         flex-direction: column;
+        position: relative;
     }
     
     [data-testid="column"]:hover {
         box-shadow: 0 8px 24px rgba(26, 77, 122, 0.15);
     }
     
-    /* אזור הגלילה של המשמרות */
-    .shifts-scroll-container {
-        overflow-y: auto;
-        overflow-x: hidden;
-        padding: 0 1rem 1rem 1rem;
-        flex: 1;
+    /* התוכן הפנימי של העמודה צריך גלילה */
+    [data-testid="column"] > div {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        height: 100%;
+        position: relative;
     }
     
-    /* סגנון סרגל הגלילה */
-    .shifts-scroll-container::-webkit-scrollbar {
-        width: 8px;
+    /* Scrollbar מעוצב */
+    [data-testid="column"] > div::-webkit-scrollbar {
+        width: 6px;
     }
     
-    .shifts-scroll-container::-webkit-scrollbar-track {
-        background: #f4f1ed;
-        border-radius: 4px;
+    [data-testid="column"] > div::-webkit-scrollbar-track {
+        background: transparent;
     }
     
-    .shifts-scroll-container::-webkit-scrollbar-thumb {
-        background: #1a4d7a;
-        border-radius: 4px;
+    [data-testid="column"] > div::-webkit-scrollbar-thumb {
+        background: rgba(26, 77, 122, 0.3);
+        border-radius: 10px;
     }
     
-    .shifts-scroll-container::-webkit-scrollbar-thumb:hover {
-        background: #2e6ba8;
+    [data-testid="column"] > div::-webkit-scrollbar-thumb:hover {
+        background: rgba(26, 77, 122, 0.5);
     }
     
     /* הודעות */
@@ -208,9 +208,20 @@ def load_custom_css():
         padding: 1.25rem;
         border-radius: 12px;
         border-right: 5px solid #1a4d7a;
-        margin-bottom: 1rem;
+        margin: 1rem;
+        margin-top: 0.75rem;
         transition: all 0.3s ease;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    /* המשמרת הראשונה בכל יום */
+    .shift-card:first-of-type {
+        margin-top: 1rem;
+    }
+    
+    /* המשמרת האחרונה - padding נוסף */
+    .shift-card:last-of-type {
+        margin-bottom: 1.5rem;
     }
     
     .shift-card:hover {
@@ -290,10 +301,11 @@ def load_custom_css():
         padding: 1.5rem;
         border-radius: 12px 12px 0 0;
         text-align: center;
-        box-shadow: 0 4px 16px rgba(26, 77, 122, 0.3);
+        box-shadow: 0 2px 8px rgba(26, 77, 122, 0.3);
         position: sticky;
         top: 0;
-        z-index: 100;
+        z-index: 10;
+        margin: 0 !important;
     }
     
     .day-name {
@@ -647,9 +659,6 @@ if req_file and shi_file:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # פתיחת מיכל גלילה
-                st.markdown('<div class="shifts-scroll-container">', unsafe_allow_html=True)
-                
                 # משמרות היום
                 for idx, shift_row in shi_df.iterrows():
                     shift_key = f"{date_str}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
@@ -684,14 +693,18 @@ if req_file and shi_file:
                         col_a, col_b = st.columns([3, 1])
                         with col_a:
                             if st.button("➕ שבץ", key=f"assign_{shift_key}", use_container_width=True):
-                                st.info("פתח דיאלוג בגרסה המלאה")
+                                show_assignment_dialog(
+                                    shift_key,
+                                    date_str,
+                                    shift_row['תחנה'],
+                                    shift_row['משמרת'],
+                                    req_df,
+                                    balance
+                                )
                         with col_b:
                             if st.button("🚫", key=f"cancel_{shift_key}", use_container_width=True):
                                 st.session_state.cancelled_shifts.add(shift_key)
                                 st.rerun()
-                
-                # סגירת מיכל הגלילה
-                st.markdown('</div>', unsafe_allow_html=True)
         
     except Exception as e:
         st.error(f"❌ שגיאה: {str(e)}")
