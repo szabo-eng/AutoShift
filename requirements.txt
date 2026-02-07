@@ -1,3 +1,10 @@
-streamlit
-pandas
-firebase-admin
+# מערכת שיבוץ מבצעית 2026 - תלויות
+
+# Core dependencies
+streamlit>=1.31.0
+pandas>=2.0.0
+firebase-admin>=6.4.0
+
+# Optional but recommended
+openpyxl>=3.1.0  # לייצוא לאקסל
+python-dateutil>=2.8.0  # לטיפול בתאריכים

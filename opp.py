@@ -235,3 +235,4 @@ if req_f and shi_f:
                 st.markdown('</div>', unsafe_allow_html=True)
 else:
     st.info("👈 יש להעלות קבצים בניהול כדי להציג את הלוח.")
+
