@@ -565,84 +565,73 @@ if req_file and shi_file:
         
         st.markdown("---")
         
-        # לוח שיבוצים עם HTML טהור
-        schedule_html = '<div class="schedule-container">'
-        
-        for date_str in dates[:7]:
-            schedule_html += f'''
-            <div class="day-column">
-                <div class="day-header-sticky">
-                    <div class="day-name">{get_day_name(date_str)}</div>
-                    <div class="day-date">{date_str}</div>
-                </div>
-                <div class="shifts-area" id="shifts-{date_str}">
-            '''
-            
-            for idx, shift_row in shi_df.iterrows():
-                shift_key = f"{date_str}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
-                assigned = st.session_state.final_schedule.get(shift_key)
-                cancelled = shift_key in st.session_state.cancelled_shifts
-                is_atan = "אט" in str(shift_row['סוג תקן'])
-                atan_class = "atan" if is_atan else ""
-                
-                schedule_html += f'''
-                <div class="shift-card {atan_class}">
-                    <div class="shift-header">
-                        <div class="shift-type">{shift_row['משמרת']}</div>
-                        <div class="shift-badge">{shift_row['סוג תקן']}</div>
-                    </div>
-                    <div class="shift-station">{shift_row['תחנה']}</div>
-                '''
-                
-                if cancelled:
-                    schedule_html += '<div class="shift-empty">🚫 מבוטל</div>'
-                elif assigned:
-                    schedule_html += f'<div class="shift-employee">👤 {assigned}</div>'
-                else:
-                    schedule_html += '<div class="shift-empty">⚠️ חסר</div>'
-                
-                schedule_html += '</div>'
-            
-            schedule_html += '</div></div>'
-        
-        schedule_html += '</div>'
-        
-        st.markdown(schedule_html, unsafe_allow_html=True)
-        
-        # כפתורי פעולה מתחת ללוח
-        st.markdown("---")
-        st.markdown("### פעולות על משמרות")
-        
+        # לוח שיבוצים - עם containers בגובה קבוע
         cols = st.columns(min(len(dates), 7))
+        
         for i, date_str in enumerate(dates[:7]):
             with cols[i]:
-                st.caption(f"{get_day_name(date_str)}")
-                for idx, shift_row in shi_df.iterrows():
-                    shift_key = f"{date_str}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
-                    assigned = st.session_state.final_schedule.get(shift_key)
-                    cancelled = shift_key in st.session_state.cancelled_shifts
-                    
-                    if cancelled:
-                        if st.button("🔄", key=f"restore_{shift_key}", help="שחזר משמרת"):
-                            st.session_state.cancelled_shifts.remove(shift_key)
-                            st.rerun()
-                    elif assigned:
-                        if st.button("🗑️", key=f"remove_{shift_key}", help=f"הסר {assigned}"):
-                            del st.session_state.final_schedule[shift_key]
-                            st.session_state.assigned_today[date_str].discard(assigned)
-                            st.rerun()
-                    else:
-                        col_a, col_b = st.columns([3, 1])
-                        with col_a:
-                            if st.button("➕", key=f"assign_{shift_key}", help="שבץ עובד"):
-                                show_assignment_dialog(
-                                    shift_key, date_str, shift_row['תחנה'], 
-                                    shift_row['משמרת'], req_df, balance
-                                )
-                        with col_b:
-                            if st.button("🚫", key=f"cancel_{shift_key}", help="בטל משמרת"):
-                                st.session_state.cancelled_shifts.add(shift_key)
+                # כותרת קבועה
+                st.markdown(f"""
+                <div style="
+                    background: linear-gradient(135deg, #1a4d7a 0%, #2e6ba8 100%);
+                    color: white;
+                    padding: 1.5rem;
+                    border-radius: 16px 16px 0 0;
+                    text-align: center;
+                    margin-bottom: 0;
+                ">
+                    <div style="font-size: 1.4rem; font-weight: 700; font-family: 'Rubik', sans-serif; margin-bottom: 0.25rem;">
+                        {get_day_name(date_str)}
+                    </div>
+                    <div style="font-size: 0.95rem; opacity: 0.9;">
+                        {date_str}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Container עם גלילה
+                with st.container(height=600):
+                    for idx, shift_row in shi_df.iterrows():
+                        shift_key = f"{date_str}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
+                        assigned = st.session_state.final_schedule.get(shift_key)
+                        cancelled = shift_key in st.session_state.cancelled_shifts
+                        is_atan = "אט" in str(shift_row['סוג תקן'])
+                        
+                        # כרטיס משמרת
+                        atan_class = "atan" if is_atan else ""
+                        st.markdown(f"""
+                        <div class="shift-card {atan_class}">
+                            <div class="shift-header">
+                                <div class="shift-type">{shift_row['משמרת']}</div>
+                                <div class="shift-badge">{shift_row['סוג תקן']}</div>
+                            </div>
+                            <div class="shift-station">{shift_row['תחנה']}</div>
+                        """, unsafe_allow_html=True)
+                        
+                        if cancelled:
+                            st.markdown('<div class="shift-empty">🚫 מבוטל</div></div>', unsafe_allow_html=True)
+                            if st.button("🔄 שחזר", key=f"restore_{shift_key}", use_container_width=True):
+                                st.session_state.cancelled_shifts.remove(shift_key)
                                 st.rerun()
+                        elif assigned:
+                            st.markdown(f'<div class="shift-employee">👤 {assigned}</div></div>', unsafe_allow_html=True)
+                            if st.button("🗑️ הסר", key=f"remove_{shift_key}", use_container_width=True):
+                                del st.session_state.final_schedule[shift_key]
+                                st.session_state.assigned_today[date_str].discard(assigned)
+                                st.rerun()
+                        else:
+                            st.markdown('<div class="shift-empty">⚠️ חסר</div></div>', unsafe_allow_html=True)
+                            col_a, col_b = st.columns([3, 1])
+                            with col_a:
+                                if st.button("➕ שבץ", key=f"assign_{shift_key}", use_container_width=True):
+                                    show_assignment_dialog(
+                                        shift_key, date_str, shift_row['תחנה'], 
+                                        shift_row['משמרת'], req_df, balance
+                                    )
+                            with col_b:
+                                if st.button("🚫", key=f"cancel_{shift_key}", use_container_width=True):
+                                    st.session_state.cancelled_shifts.add(shift_key)
+                                    st.rerun()
         
     except Exception as e:
         st.error(f"❌ שגיאה: {str(e)}")
