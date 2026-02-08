@@ -1,5 +1,5 @@
 """
-מערכת שיבוץ מבצעית 2026 - עם כותרות קבועות
+מערכת שיבוץ מבצעית 2026 - תצוגת לוח שנה
 """
 
 import streamlit as st
@@ -30,7 +30,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS מתקדם עם STICKY שעובד ---
+# --- CSS לטבלת לוח שנה ---
 def load_custom_css():
     st.markdown("""
     <style>
@@ -75,22 +75,18 @@ def load_custom_css():
     
     /* כפתורים */
     .stButton > button {
-        border-radius: 12px !important;
+        border-radius: 8px !important;
         font-weight: 600 !important;
         font-family: 'Heebo', sans-serif !important;
         transition: all 0.3s ease !important;
         border: none !important;
-        padding: 0.75rem 1.5rem !important;
+        padding: 0.6rem 1rem !important;
+        font-size: 0.9rem !important;
     }
     
     .stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #1a4d7a 0%, #2e6ba8 100%) !important;
         box-shadow: 0 4px 16px rgba(26, 77, 122, 0.3) !important;
-    }
-    
-    .stButton > button[kind="primary"]:hover {
-        transform: translateY(-3px) !important;
-        box-shadow: 0 8px 24px rgba(26, 77, 122, 0.4) !important;
     }
     
     /* מדדים */
@@ -101,178 +97,178 @@ def load_custom_css():
         color: #1a4d7a !important;
     }
     
-    /* Container מותאם לגלילה אופקית */
-    .schedule-container {
-        display: flex;
-        gap: 1.5rem;
-        overflow-x: auto;
-        padding: 1rem 0;
-        margin: 0 -1rem;
-        padding: 1rem;
-    }
-    
-    .schedule-container::-webkit-scrollbar {
-        height: 8px;
-    }
-    
-    .schedule-container::-webkit-scrollbar-track {
-        background: #f4f1ed;
-        border-radius: 10px;
-    }
-    
-    .schedule-container::-webkit-scrollbar-thumb {
-        background: rgba(26, 77, 122, 0.3);
-        border-radius: 10px;
-    }
-    
-    .schedule-container::-webkit-scrollbar-thumb:hover {
-        background: rgba(26, 77, 122, 0.5);
-    }
-    
-    /* עמודת יום */
-    .day-column {
-        min-width: 320px;
-        max-width: 320px;
+    /* טבלת לוח שנה */
+    .calendar-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
         background: white;
         border-radius: 16px;
-        box-shadow: 0 4px 16px rgba(26, 77, 122, 0.08);
-        display: flex;
-        flex-direction: column;
-        max-height: 75vh;
         overflow: hidden;
+        box-shadow: 0 8px 32px rgba(26, 77, 122, 0.12);
+        margin: 2rem 0;
     }
     
-    /* כותרת יום - STICKY שעובד! */
-    .day-header-sticky {
-        background: linear-gradient(135deg, #1a4d7a 0%, #2e6ba8 100%);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 16px 16px 0 0;
-        text-align: center;
+    /* שורת כותרת - STICKY! */
+    .calendar-header-row {
         position: sticky;
         top: 0;
-        z-index: 10;
-        box-shadow: 0 4px 16px rgba(26, 77, 122, 0.4);
+        z-index: 100;
+        background: linear-gradient(135deg, #1a4d7a 0%, #2e6ba8 100%);
+    }
+    
+    .calendar-header-cell {
+        padding: 1.5rem 1rem;
+        text-align: center;
+        color: white;
+        font-weight: 700;
+        font-family: 'Rubik', sans-serif;
+        border-left: 2px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .calendar-header-cell:first-child {
+        border-right: 2px solid rgba(255, 255, 255, 0.1);
+        border-left: none;
     }
     
     .day-name {
-        font-size: 1.4rem;
-        font-weight: 700;
-        font-family: 'Rubik', sans-serif;
+        font-size: 1.3rem;
+        display: block;
         margin-bottom: 0.25rem;
     }
     
     .day-date {
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         opacity: 0.9;
+        font-weight: 400;
     }
     
-    /* אזור המשמרות - גולל */
-    .shifts-area {
-        flex: 1;
-        overflow-y: auto;
-        overflow-x: hidden;
+    /* שורות משמרות */
+    .calendar-row {
+        border-bottom: 1px solid #e8e4df;
+        transition: background-color 0.2s ease;
+    }
+    
+    .calendar-row:hover {
+        background-color: #fafafa;
+    }
+    
+    .calendar-row:last-child {
+        border-bottom: none;
+    }
+    
+    /* תא משמרת */
+    .calendar-cell {
         padding: 1rem;
+        border-left: 1px solid #e8e4df;
+        vertical-align: top;
+        min-height: 120px;
     }
     
-    .shifts-area::-webkit-scrollbar {
-        width: 6px;
+    .calendar-cell:first-child {
+        border-right: 1px solid #e8e4df;
+        border-left: none;
     }
     
-    .shifts-area::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    
-    .shifts-area::-webkit-scrollbar-thumb {
-        background: rgba(26, 77, 122, 0.2);
-        border-radius: 10px;
-    }
-    
-    .shifts-area::-webkit-scrollbar-thumb:hover {
-        background: rgba(26, 77, 122, 0.4);
-    }
-    
-    /* כרטיס משמרת */
-    .shift-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
-        padding: 1.25rem;
-        border-radius: 12px;
-        border-right: 5px solid #1a4d7a;
-        margin-bottom: 1rem;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    
-    .shift-card:hover {
-        transform: translateX(-5px);
-        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-    }
-    
-    .shift-card.atan {
-        border-right-color: #e67e22;
-        background: linear-gradient(135deg, #fff9f0 0%, #fef5e7 100%);
-    }
-    
-    .shift-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.75rem;
-    }
-    
-    .shift-type {
+    /* תווית שורה - שם המשמרת */
+    .shift-row-label {
+        background: linear-gradient(135deg, #f4f1ed 0%, #faf8f5 100%);
+        padding: 1.5rem 1.5rem;
         font-weight: 700;
         font-size: 1.1rem;
         color: #1a4d7a;
         font-family: 'Rubik', sans-serif;
+        border-left: 5px solid #1a4d7a;
+        position: sticky;
+        right: 0;
+        text-align: center;
     }
     
-    .shift-card.atan .shift-type {
+    .shift-row-label.atan {
+        border-left-color: #e67e22;
         color: #e67e22;
     }
     
-    .shift-badge {
-        padding: 0.25rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        background: rgba(26, 77, 122, 0.1);
-        color: #1a4d7a;
+    /* כרטיס משמרת בתוך תא */
+    .shift-card-mini {
+        background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
+        padding: 0.75rem;
+        border-radius: 8px;
+        border-right: 4px solid #1a4d7a;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s ease;
     }
     
-    .shift-card.atan .shift-badge {
-        background: rgba(230, 126, 34, 0.1);
-        color: #e67e22;
+    .shift-card-mini:hover {
+        transform: translateX(-3px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     
-    .shift-station {
+    .shift-card-mini.atan {
+        border-right-color: #e67e22;
+        background: linear-gradient(135deg, #fff9f0 0%, #fef5e7 100%);
+    }
+    
+    .shift-info-mini {
+        font-size: 0.85rem;
         color: #7f8c8d;
-        font-size: 0.9rem;
         margin-bottom: 0.5rem;
     }
     
-    .shift-employee {
+    .shift-employee-mini {
         background: rgba(39, 174, 96, 0.1);
-        padding: 0.75rem;
-        border-radius: 8px;
+        padding: 0.5rem;
+        border-radius: 6px;
         color: #27ae60;
         font-weight: 600;
+        font-size: 0.9rem;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        margin-top: 0.75rem;
+        gap: 0.25rem;
     }
     
-    .shift-empty {
+    .shift-empty-mini {
         background: rgba(231, 76, 60, 0.1);
-        padding: 0.75rem;
-        border-radius: 8px;
+        padding: 0.5rem;
+        border-radius: 6px;
         color: #e74c3c;
         font-weight: 600;
+        font-size: 0.9rem;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        margin-top: 0.75rem;
+        gap: 0.25rem;
+    }
+    
+    .shift-cancelled-mini {
+        background: rgba(127, 140, 141, 0.1);
+        padding: 0.5rem;
+        border-radius: 6px;
+        color: #7f8c8d;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-align: center;
+    }
+    
+    /* כפתורי פעולה קטנים */
+    .action-buttons {
+        display: flex;
+        gap: 0.25rem;
+        margin-top: 0.5rem;
+    }
+    
+    .btn-mini {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.75rem;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-mini:hover {
+        transform: translateY(-2px);
     }
     
     /* הודעות */
@@ -280,21 +276,39 @@ def load_custom_css():
         background-color: rgba(39, 174, 96, 0.1) !important;
         border-right: 4px solid #27ae60 !important;
         border-radius: 8px !important;
-        padding: 1rem !important;
     }
     
     .stError {
         background-color: rgba(231, 76, 60, 0.1) !important;
         border-right: 4px solid #e74c3c !important;
         border-radius: 8px !important;
-        padding: 1rem !important;
     }
     
-    .stInfo {
-        background-color: rgba(26, 77, 122, 0.1) !important;
-        border-right: 4px solid #1a4d7a !important;
-        border-radius: 8px !important;
-        padding: 1rem !important;
+    /* Container גלילה */
+    .table-container {
+        max-height: 70vh;
+        overflow-y: auto;
+        overflow-x: auto;
+        border-radius: 16px;
+    }
+    
+    .table-container::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    .table-container::-webkit-scrollbar-track {
+        background: #f4f1ed;
+        border-radius: 10px;
+    }
+    
+    .table-container::-webkit-scrollbar-thumb {
+        background: rgba(26, 77, 122, 0.3);
+        border-radius: 10px;
+    }
+    
+    .table-container::-webkit-scrollbar-thumb:hover {
+        background: rgba(26, 77, 122, 0.5);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -307,7 +321,6 @@ def initialize_firebase():
         try:
             cred = credentials.Certificate(dict(st.secrets["firebase"]))
             firebase_admin.initialize_app(cred)
-            logger.info("Firebase initialized")
         except Exception as e:
             st.error(f"❌ שגיאה בחיבור ל-Firebase: {str(e)}")
             return None
@@ -516,7 +529,7 @@ with st.sidebar:
             st.metric("עובדים", employees)
 
 # --- Main ---
-st.title("📅 מערכת שיבוץ מבצעית 2026")
+st.title("📅 לוח שיבוצים שבועי")
 
 if req_file and shi_file:
     try:
@@ -546,7 +559,6 @@ if req_file and shi_file:
             st.rerun()
         
         # מדדים
-        st.markdown("---")
         if st.session_state.final_schedule:
             total_shifts = len(shi_df) * len(dates) - len(st.session_state.cancelled_shifts)
             assigned = len(st.session_state.final_schedule)
@@ -565,73 +577,101 @@ if req_file and shi_file:
         
         st.markdown("---")
         
-        # לוח שיבוצים - עם containers בגובה קבוע
-        cols = st.columns(min(len(dates), 7))
+        # בניית טבלת לוח שנה
+        table_html = '<div class="table-container"><table class="calendar-table">'
         
-        for i, date_str in enumerate(dates[:7]):
-            with cols[i]:
-                # כותרת קבועה
-                st.markdown(f"""
-                <div style="
-                    background: linear-gradient(135deg, #1a4d7a 0%, #2e6ba8 100%);
-                    color: white;
-                    padding: 1.5rem;
-                    border-radius: 16px 16px 0 0;
-                    text-align: center;
-                    margin-bottom: 0;
-                ">
-                    <div style="font-size: 1.4rem; font-weight: 700; font-family: 'Rubik', sans-serif; margin-bottom: 0.25rem;">
-                        {get_day_name(date_str)}
-                    </div>
-                    <div style="font-size: 0.95rem; opacity: 0.9;">
-                        {date_str}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+        # שורת כותרת - ימים ותאריכים (STICKY)
+        table_html += '<tr class="calendar-header-row">'
+        table_html += '<th class="calendar-header-cell shift-row-label">משמרת</th>'
+        for date_str in dates[:7]:
+            table_html += f'''
+            <th class="calendar-header-cell">
+                <span class="day-name">{get_day_name(date_str)}</span>
+                <span class="day-date">{date_str}</span>
+            </th>
+            '''
+        table_html += '</tr>'
+        
+        # שורות משמרות
+        for idx, shift_row in shi_df.iterrows():
+            is_atan = "אט" in str(shift_row['סוג תקן'])
+            atan_class = "atan" if is_atan else ""
+            
+            table_html += '<tr class="calendar-row">'
+            table_html += f'''
+            <td class="shift-row-label {atan_class}">
+                {shift_row['משמרת']}<br>
+                <small style="font-weight: 400; font-size: 0.85rem;">{shift_row['סוג תקן']}</small>
+            </td>
+            '''
+            
+            # תא לכל יום
+            for date_str in dates[:7]:
+                shift_key = f"{date_str}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
+                assigned = st.session_state.final_schedule.get(shift_key)
+                cancelled = shift_key in st.session_state.cancelled_shifts
                 
-                # Container עם גלילה
-                with st.container(height=600):
-                    for idx, shift_row in shi_df.iterrows():
-                        shift_key = f"{date_str}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
-                        assigned = st.session_state.final_schedule.get(shift_key)
-                        cancelled = shift_key in st.session_state.cancelled_shifts
-                        is_atan = "אט" in str(shift_row['סוג תקן'])
-                        
-                        # כרטיס משמרת
-                        atan_class = "atan" if is_atan else ""
-                        st.markdown(f"""
-                        <div class="shift-card {atan_class}">
-                            <div class="shift-header">
-                                <div class="shift-type">{shift_row['משמרת']}</div>
-                                <div class="shift-badge">{shift_row['סוג תקן']}</div>
-                            </div>
-                            <div class="shift-station">{shift_row['תחנה']}</div>
-                        """, unsafe_allow_html=True)
-                        
-                        if cancelled:
-                            st.markdown('<div class="shift-empty">🚫 מבוטל</div></div>', unsafe_allow_html=True)
-                            if st.button("🔄 שחזר", key=f"restore_{shift_key}", use_container_width=True):
-                                st.session_state.cancelled_shifts.remove(shift_key)
-                                st.rerun()
-                        elif assigned:
-                            st.markdown(f'<div class="shift-employee">👤 {assigned}</div></div>', unsafe_allow_html=True)
-                            if st.button("🗑️ הסר", key=f"remove_{shift_key}", use_container_width=True):
-                                del st.session_state.final_schedule[shift_key]
-                                st.session_state.assigned_today[date_str].discard(assigned)
-                                st.rerun()
-                        else:
-                            st.markdown('<div class="shift-empty">⚠️ חסר</div></div>', unsafe_allow_html=True)
-                            col_a, col_b = st.columns([3, 1])
-                            with col_a:
-                                if st.button("➕ שבץ", key=f"assign_{shift_key}", use_container_width=True):
-                                    show_assignment_dialog(
-                                        shift_key, date_str, shift_row['תחנה'], 
-                                        shift_row['משמרת'], req_df, balance
-                                    )
-                            with col_b:
-                                if st.button("🚫", key=f"cancel_{shift_key}", use_container_width=True):
-                                    st.session_state.cancelled_shifts.add(shift_key)
-                                    st.rerun()
+                table_html += '<td class="calendar-cell">'
+                table_html += f'<div class="shift-card-mini {atan_class}">'
+                table_html += f'<div class="shift-info-mini">{shift_row["תחנה"]}</div>'
+                
+                if cancelled:
+                    table_html += '<div class="shift-cancelled-mini">🚫 מבוטל</div>'
+                elif assigned:
+                    table_html += f'<div class="shift-employee-mini">👤 {assigned}</div>'
+                else:
+                    table_html += '<div class="shift-empty-mini">⚠️ פנוי</div>'
+                
+                table_html += '</div></td>'
+            
+            table_html += '</tr>'
+        
+        table_html += '</table></div>'
+        
+        st.markdown(table_html, unsafe_allow_html=True)
+        
+        # כפתורי פעולה
+        st.markdown("---")
+        st.markdown("### 🔧 פעולות")
+        
+        # בחירת משמרת לעריכה
+        shift_options = []
+        for idx, shift_row in shi_df.iterrows():
+            shift_options.append(f"{shift_row['משמרת']} - {shift_row['תחנה']} ({shift_row['סוג תקן']})")
+        
+        selected_shift_idx = st.selectbox("בחר משמרת:", range(len(shift_options)), format_func=lambda x: shift_options[x])
+        selected_shift = shi_df.iloc[selected_shift_idx]
+        
+        st.markdown(f"**משמרת נבחרת:** {selected_shift['משמרת']} - {selected_shift['תחנה']}")
+        
+        cols = st.columns(7)
+        for i, date_str in enumerate(dates[:7]):
+            shift_key = f"{date_str}_{selected_shift['תחנה']}_{selected_shift['משמרת']}_{selected_shift_idx}"
+            assigned = st.session_state.final_schedule.get(shift_key)
+            cancelled = shift_key in st.session_state.cancelled_shifts
+            
+            with cols[i]:
+                st.caption(get_day_name(date_str))
+                
+                if cancelled:
+                    if st.button("🔄 שחזר", key=f"restore_{shift_key}", use_container_width=True):
+                        st.session_state.cancelled_shifts.remove(shift_key)
+                        st.rerun()
+                elif assigned:
+                    st.info(f"👤 {assigned}")
+                    if st.button("🗑️ הסר", key=f"remove_{shift_key}", use_container_width=True):
+                        del st.session_state.final_schedule[shift_key]
+                        st.session_state.assigned_today[date_str].discard(assigned)
+                        st.rerun()
+                else:
+                    if st.button("➕ שבץ", key=f"assign_{shift_key}", use_container_width=True):
+                        show_assignment_dialog(
+                            shift_key, date_str, selected_shift['תחנה'], 
+                            selected_shift['משמרת'], req_df, balance
+                        )
+                    if st.button("🚫 בטל", key=f"cancel_{shift_key}", use_container_width=True):
+                        st.session_state.cancelled_shifts.add(shift_key)
+                        st.rerun()
         
     except Exception as e:
         st.error(f"❌ שגיאה: {str(e)}")
@@ -645,8 +685,9 @@ else:
         
         1. **העלאת קבצים** - העלה CSV עם בקשות ומשמרות
         2. **שיבוץ אוטומטי** - לחץ על הכפתור לשיבוץ חכם
-        3. **התאמות ידניות** - שבץ/הסר לפי צורך
-        4. **שמירה** - שמור ל-Database או ייצא לאקסל
+        3. **צפייה בלוח** - לוח שנה עם 7 עמודות (ימים)
+        4. **עריכה** - בחר משמרת מהרשימה ושבץ/הסר לכל יום
+        5. **שמירה** - שמור ל-Database או ייצא לאקסל
         
         ### פורמט קבצים:
         - **בקשות:** שם, תאריך מבוקש, משמרת, תחנה
