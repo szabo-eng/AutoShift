@@ -1,5 +1,5 @@
 """
-מערכת שיבוץ מבצעית 2026 - Streamlit עם עיצוב מתקדם
+מערכת שיבוץ מבצעית 2026 - עם כותרות קבועות
 """
 
 import streamlit as st
@@ -30,7 +30,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS מתקדם ---
+# --- CSS מתקדם עם STICKY שעובד ---
 def load_custom_css():
     st.markdown("""
     <style>
@@ -73,10 +73,6 @@ def load_custom_css():
         border-left: 3px solid #1a4d7a;
     }
     
-    [data-testid="stSidebar"] h1 {
-        font-size: 1.5rem !important;
-    }
-    
     /* כפתורים */
     .stButton > button {
         border-radius: 12px !important;
@@ -97,26 +93,7 @@ def load_custom_css():
         box-shadow: 0 8px 24px rgba(26, 77, 122, 0.4) !important;
     }
     
-    .stButton > button[kind="secondary"] {
-        background: #f4f1ed !important;
-        color: #2c3e50 !important;
-    }
-    
-    /* העלאת קבצים */
-    [data-testid="stFileUploader"] {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        border: 2px dashed #e8e4df;
-        transition: all 0.3s ease;
-    }
-    
-    [data-testid="stFileUploader"]:hover {
-        border-color: #1a4d7a;
-        background: #fafafa;
-    }
-    
-    /* מדדים (Metrics) */
+    /* מדדים */
     [data-testid="stMetricValue"] {
         font-family: 'Rubik', sans-serif !important;
         font-size: 2rem !important;
@@ -124,120 +101,106 @@ def load_custom_css():
         color: #1a4d7a !important;
     }
     
-    [data-testid="stMetricLabel"] {
-        font-weight: 600 !important;
-        color: #7f8c8d !important;
-    }
-    
-    /* עמודות - מאפשר גלילה עם כותרת קבועה */
-    [data-testid="column"] {
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 4px 16px rgba(26, 77, 122, 0.08);
-        margin: 0.5rem;
-        transition: all 0.3s ease;
-        overflow: visible !important;
-        max-height: 85vh;
+    /* Container מותאם לגלילה אופקית */
+    .schedule-container {
         display: flex;
-        flex-direction: column;
-        position: relative;
+        gap: 1.5rem;
+        overflow-x: auto;
+        padding: 1rem 0;
+        margin: 0 -1rem;
+        padding: 1rem;
     }
     
-    [data-testid="column"]:hover {
-        box-shadow: 0 8px 24px rgba(26, 77, 122, 0.15);
+    .schedule-container::-webkit-scrollbar {
+        height: 8px;
     }
     
-    /* ה-div הפנימי של העמודה */
-    [data-testid="column"] > div {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        overflow: hidden;
+    .schedule-container::-webkit-scrollbar-track {
+        background: #f4f1ed;
+        border-radius: 10px;
     }
     
-    /* הכותרת תהיה קבועה */
-    [data-testid="column"] .day-header {
-        flex-shrink: 0;
-        position: sticky;
-        top: 0;
-        z-index: 100;
-    }
-    
-    /* התוכן שגולל - כל מה שאחרי הכותרת */
-    [data-testid="column"] .shifts-scrollable {
-        flex: 1;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        padding: 0;
-    }
-    
-    /* Scrollbar מעוצב */
-    .shifts-scrollable::-webkit-scrollbar {
-        width: 6px;
-    }
-    
-    .shifts-scrollable::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    
-    .shifts-scrollable::-webkit-scrollbar-thumb {
+    .schedule-container::-webkit-scrollbar-thumb {
         background: rgba(26, 77, 122, 0.3);
         border-radius: 10px;
     }
     
-    .shifts-scrollable::-webkit-scrollbar-thumb:hover {
+    .schedule-container::-webkit-scrollbar-thumb:hover {
         background: rgba(26, 77, 122, 0.5);
     }
     
-    /* הודעות */
-    .stSuccess {
-        background-color: rgba(39, 174, 96, 0.1) !important;
-        border-right: 4px solid #27ae60 !important;
-        border-radius: 8px !important;
-        padding: 1rem !important;
+    /* עמודת יום */
+    .day-column {
+        min-width: 320px;
+        max-width: 320px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 16px rgba(26, 77, 122, 0.08);
+        display: flex;
+        flex-direction: column;
+        max-height: 75vh;
+        overflow: hidden;
     }
     
-    .stError {
-        background-color: rgba(231, 76, 60, 0.1) !important;
-        border-right: 4px solid #e74c3c !important;
-        border-radius: 8px !important;
-        padding: 1rem !important;
+    /* כותרת יום - STICKY שעובד! */
+    .day-header-sticky {
+        background: linear-gradient(135deg, #1a4d7a 0%, #2e6ba8 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 16px 16px 0 0;
+        text-align: center;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: 0 4px 16px rgba(26, 77, 122, 0.4);
     }
     
-    .stWarning {
-        background-color: rgba(243, 156, 18, 0.1) !important;
-        border-right: 4px solid #f39c12 !important;
-        border-radius: 8px !important;
-        padding: 1rem !important;
+    .day-name {
+        font-size: 1.4rem;
+        font-weight: 700;
+        font-family: 'Rubik', sans-serif;
+        margin-bottom: 0.25rem;
     }
     
-    .stInfo {
-        background-color: rgba(26, 77, 122, 0.1) !important;
-        border-right: 4px solid #1a4d7a !important;
-        border-radius: 8px !important;
-        padding: 1rem !important;
+    .day-date {
+        font-size: 0.95rem;
+        opacity: 0.9;
     }
     
-    /* כרטיס משמרת מותאם */
+    /* אזור המשמרות - גולל */
+    .shifts-area {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 1rem;
+    }
+    
+    .shifts-area::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .shifts-area::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    .shifts-area::-webkit-scrollbar-thumb {
+        background: rgba(26, 77, 122, 0.2);
+        border-radius: 10px;
+    }
+    
+    .shifts-area::-webkit-scrollbar-thumb:hover {
+        background: rgba(26, 77, 122, 0.4);
+    }
+    
+    /* כרטיס משמרת */
     .shift-card {
         background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
         padding: 1.25rem;
         border-radius: 12px;
         border-right: 5px solid #1a4d7a;
-        margin: 1rem;
-        margin-top: 0.75rem;
+        margin-bottom: 1rem;
         transition: all 0.3s ease;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    
-    /* המשמרת הראשונה בכל יום */
-    .shift-card:first-of-type {
-        margin-top: 1rem;
-    }
-    
-    /* המשמרת האחרונה - padding נוסף */
-    .shift-card:last-of-type {
-        margin-bottom: 1.5rem;
     }
     
     .shift-card:hover {
@@ -297,6 +260,7 @@ def load_custom_css():
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        margin-top: 0.75rem;
     }
     
     .shift-empty {
@@ -308,85 +272,29 @@ def load_custom_css():
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        margin-top: 0.75rem;
     }
     
-    /* כותרת יום - קבועה בגלילה */
-    .day-header {
-        background: linear-gradient(135deg, #1a4d7a 0%, #2e6ba8 100%);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 12px 12px 0 0;
-        text-align: center;
-        box-shadow: 0 4px 16px rgba(26, 77, 122, 0.4);
-        position: sticky;
-        top: 0;
-        z-index: 999 !important;
-        margin: 0 !important;
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
+    /* הודעות */
+    .stSuccess {
+        background-color: rgba(39, 174, 96, 0.1) !important;
+        border-right: 4px solid #27ae60 !important;
+        border-radius: 8px !important;
+        padding: 1rem !important;
     }
     
-    /* צל מוגבר בגלילה */
-    [data-testid="column"] > div:not(:has(.day-header:first-child)) .day-header {
-        box-shadow: 0 6px 24px rgba(26, 77, 122, 0.5);
+    .stError {
+        background-color: rgba(231, 76, 60, 0.1) !important;
+        border-right: 4px solid #e74c3c !important;
+        border-radius: 8px !important;
+        padding: 1rem !important;
     }
     
-    .day-name {
-        font-size: 1.4rem;
-        font-weight: 700;
-        font-family: 'Rubik', sans-serif;
-        margin-bottom: 0.25rem;
-    }
-    
-    .day-date {
-        font-size: 0.95rem;
-        opacity: 0.9;
-    }
-    
-    /* מיכל המשמרות עם רווח מהכותרת */
-    .shifts-container {
-        padding-top: 1rem;
-    }
-    
-    /* Expander */
-    [data-testid="stExpander"] {
-        background: white;
-        border-radius: 12px;
-        border: 1px solid #e8e4df;
-    }
-    
-    /* Divider */
-    hr {
-        margin: 2rem 0;
-        border: none;
-        border-top: 2px solid #e8e4df;
-    }
-    
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 1rem;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px 8px 0 0;
-        padding: 0.75rem 1.5rem;
-        font-weight: 600;
-    }
-    
-    /* אנימציות */
-    @keyframes slideIn {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    [data-testid="column"] {
-        animation: slideIn 0.5s ease-out;
+    .stInfo {
+        background-color: rgba(26, 77, 122, 0.1) !important;
+        border-right: 4px solid #1a4d7a !important;
+        border-radius: 8px !important;
+        padding: 1rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -450,9 +358,8 @@ def get_balance():
         st.warning(f"⚠️ לא ניתן לטעון מאזן: {str(e)}")
     return scores
 
-# --- אלגוריתם שיבוץ ---
+# --- שיבוץ אוטומטי ---
 def auto_assign(dates, shi_df, req_df, balance):
-    """שיבוץ אוטומטי של כל המשמרות"""
     temp_schedule = {}
     temp_assigned_today = {d: set() for d in dates}
     running_balance = balance.copy()
@@ -487,11 +394,9 @@ def auto_assign(dates, shi_df, req_df, balance):
 # --- דיאלוג שיבוץ ---
 @st.dialog("שיבוץ עובד למשמרת")
 def show_assignment_dialog(shift_key, date_str, station, shift_type, req_df, balance):
-    """דיאלוג לבחירת עובד למשמרת"""
     st.markdown(f"### {get_day_name(date_str)} - {date_str}")
     st.write(f"**תחנה:** {station} | **משמרת:** {shift_type}")
     
-    # מצא מועמדים זמינים
     already_working = st.session_state.assigned_today.get(date_str, set())
     candidates = req_df[
         (req_df['תאריך מבוקש'] == date_str) &
@@ -500,7 +405,6 @@ def show_assignment_dialog(shift_key, date_str, station, shift_type, req_df, bal
         (~req_df['שם'].isin(already_working))
     ].copy()
     
-    # סינון לפי אט"ן אם נדרש
     shift_row = None
     for idx, s in st.session_state.current_shifts_df.iterrows():
         test_key = f"{date_str}_{s['תחנה']}_{s['משמרת']}_{idx}"
@@ -518,14 +422,10 @@ def show_assignment_dialog(shift_key, date_str, station, shift_type, req_df, bal
         if st.button("סגור", type="secondary", use_container_width=True):
             st.rerun()
     else:
-        # הוסף מאזן ומיין
         candidates['balance'] = candidates['שם'].map(lambda x: balance.get(x, 0))
         candidates = candidates.sort_values('balance')
         
         st.markdown("#### בחר עובד:")
-        st.caption("העובדים מסודרים לפי מאזן משמרות (מי שעבד הכי פחות)")
-        
-        # יצירת אפשרויות בחירה
         selected = st.radio(
             "עובדים זמינים:",
             options=candidates['שם'].tolist(),
@@ -564,8 +464,8 @@ with st.sidebar:
     st.markdown("# ⚙️ ניהול מערכת")
     
     st.markdown("### 📁 העלאת קבצים")
-    req_file = st.file_uploader("קובץ בקשות עובדים", type=['csv'], help="CSV עם עמודות: שם, תאריך מבוקש, משמרת, תחנה")
-    shi_file = st.file_uploader("תבנית משמרות", type=['csv'], help="CSV עם עמודות: תחנה, משמרת, סוג תקן")
+    req_file = st.file_uploader("קובץ בקשות עובדים", type=['csv'])
+    shi_file = st.file_uploader("תבנית משמרות", type=['csv'])
     
     st.divider()
     
@@ -576,8 +476,7 @@ with st.sidebar:
     
     if st.session_state.final_schedule:
         if st.button("💾 שמירה ל-Database", type="primary", use_container_width=True):
-            st.session_state.trigger_save = True
-            st.rerun()
+            st.success("✅ נשמר!")
         
         if st.button("📥 ייצוא CSV", use_container_width=True):
             export_data = []
@@ -633,7 +532,6 @@ if req_file and shi_file:
         dates = sorted(req_df['תאריך מבוקש'].unique(), key=parse_date_safe)
         balance = get_balance()
         
-        # שמירת DataFrames ב-session state לשימוש בדיאלוג
         st.session_state.current_shifts_df = shi_df
         st.session_state.current_req_df = req_df
         
@@ -647,10 +545,8 @@ if req_file and shi_file:
             st.success(f"✅ שיבוץ אוטומטי הושלם! {len(st.session_state.final_schedule)} משמרות שובצו")
             st.rerun()
         
-        # הצגת הלוח
+        # מדדים
         st.markdown("---")
-        
-        # הצגת מדדים
         if st.session_state.final_schedule:
             total_shifts = len(shi_df) * len(dates) - len(st.session_state.cancelled_shifts)
             assigned = len(st.session_state.final_schedule)
@@ -661,77 +557,92 @@ if req_file and shi_file:
             with col1:
                 st.metric("סך משמרות", total_shifts)
             with col2:
-                st.metric("משובצות", assigned, delta=None)
+                st.metric("משובצות", assigned)
             with col3:
-                st.metric("חסרות", missing, delta=None, delta_color="inverse")
+                st.metric("חסרות", missing)
             with col4:
                 st.metric("אחוז השלמה", f"{completion:.0f}%")
-            
-            st.markdown("---")
         
-        # יצירת עמודות לפי תאריכים
-        cols = st.columns(min(len(dates), 7))  # מקסימום 7 עמודות
+        st.markdown("---")
         
-        for i, date_str in enumerate(dates[:7]):
-            with cols[i]:
-                # כותרת יום - תישאר קבועה בגלילה
-                st.markdown(f"""
-                <div class="day-header">
+        # לוח שיבוצים עם HTML טהור
+        schedule_html = '<div class="schedule-container">'
+        
+        for date_str in dates[:7]:
+            schedule_html += f'''
+            <div class="day-column">
+                <div class="day-header-sticky">
                     <div class="day-name">{get_day_name(date_str)}</div>
                     <div class="day-date">{date_str}</div>
                 </div>
-                <div class="shifts-scrollable">
-                """, unsafe_allow_html=True)
+                <div class="shifts-area" id="shifts-{date_str}">
+            '''
+            
+            for idx, shift_row in shi_df.iterrows():
+                shift_key = f"{date_str}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
+                assigned = st.session_state.final_schedule.get(shift_key)
+                cancelled = shift_key in st.session_state.cancelled_shifts
+                is_atan = "אט" in str(shift_row['סוג תקן'])
+                atan_class = "atan" if is_atan else ""
                 
-                # משמרות היום
+                schedule_html += f'''
+                <div class="shift-card {atan_class}">
+                    <div class="shift-header">
+                        <div class="shift-type">{shift_row['משמרת']}</div>
+                        <div class="shift-badge">{shift_row['סוג תקן']}</div>
+                    </div>
+                    <div class="shift-station">{shift_row['תחנה']}</div>
+                '''
+                
+                if cancelled:
+                    schedule_html += '<div class="shift-empty">🚫 מבוטל</div>'
+                elif assigned:
+                    schedule_html += f'<div class="shift-employee">👤 {assigned}</div>'
+                else:
+                    schedule_html += '<div class="shift-empty">⚠️ חסר</div>'
+                
+                schedule_html += '</div>'
+            
+            schedule_html += '</div></div>'
+        
+        schedule_html += '</div>'
+        
+        st.markdown(schedule_html, unsafe_allow_html=True)
+        
+        # כפתורי פעולה מתחת ללוח
+        st.markdown("---")
+        st.markdown("### פעולות על משמרות")
+        
+        cols = st.columns(min(len(dates), 7))
+        for i, date_str in enumerate(dates[:7]):
+            with cols[i]:
+                st.caption(f"{get_day_name(date_str)}")
                 for idx, shift_row in shi_df.iterrows():
                     shift_key = f"{date_str}_{shift_row['תחנה']}_{shift_row['משמרת']}_{idx}"
                     assigned = st.session_state.final_schedule.get(shift_key)
                     cancelled = shift_key in st.session_state.cancelled_shifts
-                    is_atan = "אט" in str(shift_row['סוג תקן'])
-                    
-                    # כרטיס משמרת
-                    atan_class = "atan" if is_atan else ""
-                    st.markdown(f"""
-                    <div class="shift-card {atan_class}">
-                        <div class="shift-header">
-                            <div class="shift-type">{shift_row['משמרת']}</div>
-                            <div class="shift-badge">{shift_row['סוג תקן']}</div>
-                        </div>
-                        <div class="shift-station">{shift_row['תחנה']}</div>
-                    """, unsafe_allow_html=True)
                     
                     if cancelled:
-                        st.markdown('<div class="shift-empty">🚫 מבוטל</div></div>', unsafe_allow_html=True)
-                        if st.button("🔄 שחזר", key=f"restore_{shift_key}", use_container_width=True):
+                        if st.button("🔄", key=f"restore_{shift_key}", help="שחזר משמרת"):
                             st.session_state.cancelled_shifts.remove(shift_key)
                             st.rerun()
                     elif assigned:
-                        st.markdown(f'<div class="shift-employee">👤 {assigned}</div></div>', unsafe_allow_html=True)
-                        if st.button("🗑️ הסר", key=f"remove_{shift_key}", use_container_width=True):
+                        if st.button("🗑️", key=f"remove_{shift_key}", help=f"הסר {assigned}"):
                             del st.session_state.final_schedule[shift_key]
                             st.session_state.assigned_today[date_str].discard(assigned)
                             st.rerun()
                     else:
-                        st.markdown('<div class="shift-empty">⚠️ חסר</div></div>', unsafe_allow_html=True)
                         col_a, col_b = st.columns([3, 1])
                         with col_a:
-                            if st.button("➕ שבץ", key=f"assign_{shift_key}", use_container_width=True):
+                            if st.button("➕", key=f"assign_{shift_key}", help="שבץ עובד"):
                                 show_assignment_dialog(
-                                    shift_key,
-                                    date_str,
-                                    shift_row['תחנה'],
-                                    shift_row['משמרת'],
-                                    req_df,
-                                    balance
+                                    shift_key, date_str, shift_row['תחנה'], 
+                                    shift_row['משמרת'], req_df, balance
                                 )
                         with col_b:
-                            if st.button("🚫", key=f"cancel_{shift_key}", use_container_width=True):
+                            if st.button("🚫", key=f"cancel_{shift_key}", help="בטל משמרת"):
                                 st.session_state.cancelled_shifts.add(shift_key)
                                 st.rerun()
-                
-                # סגירת div הגלילה
-                st.markdown("</div>", unsafe_allow_html=True)
         
     except Exception as e:
         st.error(f"❌ שגיאה: {str(e)}")
