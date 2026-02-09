@@ -208,6 +208,10 @@ def show_assignment_dialog(shift_key, date_str, station, shift_type, req_df, bal
     st.markdown(f"### {get_day_name(date_str)} - {date_str}")
     st.write(f"**{station}** | **{shift_type}**")
     
+    # בדיקה בטוחה של assigned_today
+    if not isinstance(st.session_state.assigned_today, dict):
+        st.session_state.assigned_today = {}
+    
     already_working = st.session_state.assigned_today.get(date_str, set())
     candidates = req_df[
         (req_df['תאריך מבוקש'] == date_str) &
@@ -244,9 +248,14 @@ def show_assignment_dialog(shift_key, date_str, station, shift_type, req_df, bal
                 st.rerun()
 
 # Session State
-for key in ['final_schedule', 'assigned_today', 'cancelled_shifts', 'current_shifts_df']:
-    if key not in st.session_state:
-        st.session_state[key] = {} if 'shifts' in key else set() if key == 'cancelled_shifts' else None
+if 'final_schedule' not in st.session_state:
+    st.session_state.final_schedule = {}
+if 'assigned_today' not in st.session_state:
+    st.session_state.assigned_today = {}
+if 'cancelled_shifts' not in st.session_state:
+    st.session_state.cancelled_shifts = set()
+if 'current_shifts_df' not in st.session_state:
+    st.session_state.current_shifts_df = None
 
 # Sidebar
 with st.sidebar:
@@ -372,7 +381,8 @@ if req_file and shi_file:
                     elif assigned:
                         if st.button(f"🗑️ {assigned[:6]}", key=f"b_{key}", use_container_width=True):
                             del st.session_state.final_schedule[key]
-                            st.session_state.assigned_today[d].discard(assigned)
+                            if d in st.session_state.assigned_today:
+                                st.session_state.assigned_today[d].discard(assigned)
                             st.rerun()
                     else:
                         ca, cb = st.columns([3, 1])
