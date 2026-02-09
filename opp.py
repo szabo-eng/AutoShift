@@ -138,7 +138,7 @@ def get_balance_map():
 def load_csv(file):
     return pd.read_csv(file, encoding='utf-8-sig')
 
-# --- 4. לוגיקה עסקית (שיבוץ ושמירה) ---
+# --- 4. לוגיקה עסקית ---
 def run_auto_scheduler(dates, req_df, shi_df, current_balance):
     temp_schedule = {}
     temp_assigned_today = {d: set() for d in dates}
@@ -174,19 +174,16 @@ def update_firebase_db(final_schedule):
     batch = db.batch()
     updates = {}
     
-    # חישוב כמה משמרות כל עובד קיבל בשיבוץ הנוכחי
     for name in final_schedule.values():
         updates[name] = updates.get(name, 0) + 1
         
-    # הכנת העדכון ל-DB
     for name, count in updates.items():
         doc_ref = db.collection('employee_history').document(name)
-        # שימוש ב-Increment כדי להוסיף לערך הקיים ולא לדרוס אותו
         batch.set(doc_ref, {'total_shifts': firestore.Increment(count)}, merge=True)
     
     try:
         batch.commit()
-        get_balance_map.clear() # ניקוי ה-Cache כדי שהנתונים החדשים ייטענו בפעם הבאה
+        get_balance_map.clear() 
         return True
     except Exception as e:
         st.error(f"שגיאה בשמירה ל-DB: {e}")
@@ -226,7 +223,7 @@ if 'init' not in st.session_state:
     st.session_state.assigned_today = {}
     st.session_state.cancelled_shifts = set()
     st.session_state.trigger_auto = False
-    st.session_state.db_updated = False # דגל לבדיקה אם בוצע עדכון
+    st.session_state.db_updated = False
     st.session_state.init = True
 
 # --- 7. Sidebar ---
@@ -248,18 +245,15 @@ with st.sidebar:
             st.rerun()
     with col_b:
         if req_f and shi_f:
-            # --- תיקון 1: שינוי שם הכפתור ל"שבץ" ---
              if st.button("🪄 שבץ", type="primary", use_container_width=True):
                 st.session_state.trigger_auto = True
-                st.session_state.db_updated = False # איפוס סטטוס עדכון בעת שיבוץ מחדש
+                st.session_state.db_updated = False
 
     st.divider()
     
-    # Save & Export Section
     if st.session_state.final_schedule:
         st.write("### פעולות סיום")
         
-        # --- תיקון 2: כפתור עדכון נתונים ל-DB ---
         if not st.session_state.db_updated:
             if st.button("💾 עדכן נתונים ב-DB", type="primary", use_container_width=True):
                 if update_firebase_db(st.session_state.final_schedule):
@@ -269,7 +263,6 @@ with st.sidebar:
         else:
             st.success("✅ הנתונים עודכנו במערכת")
 
-        # יצירת קובץ להורדה
         if req_f and shi_f:
             shi_df_save = load_csv(shi_f)
             export_data = []
@@ -333,7 +326,8 @@ if req_f and shi_f:
                 else:
                     st.markdown(":orange[⚠️ לא משובץ]")
                     b1, b2 = st.columns([3, 1])
-                    if b1.button("➕ שבת", key=f"add_{s_key}", use_container_width=True):
+                    # --- התיקון כאן: "שבץ" במקום "שבת" ---
+                    if b1.button("➕ שבץ", key=f"add_{s_key}", use_container_width=True):
                         show_manual_picker(s_key, d_str, s, req_df, global_balance)
                     if b2.button("🚫", key=f"can_{s_key}", use_container_width=True):
                         st.session_state.cancelled_shifts.add(s_key); st.rerun()
