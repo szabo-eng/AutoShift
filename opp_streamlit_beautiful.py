@@ -204,7 +204,7 @@ def auto_assign(dates, shi_df, req_df, balance):
     return temp_schedule, temp_assigned
 
 @st.dialog("שיבוץ עובד")
-def show_assignment_dialog(shift_key, date_str, station, shift_type, req_df, balance):
+def show_assignment_dialog(shift_key, date_str, station, shift_type, req_df, balance, shi_df):
     st.markdown(f"### {get_day_name(date_str)} - {date_str}")
     st.write(f"**{station}** | **{shift_type}**")
     
@@ -219,6 +219,19 @@ def show_assignment_dialog(shift_key, date_str, station, shift_type, req_df, bal
         (req_df['תחנה'] == station) &
         (~req_df['שם'].isin(already_working))
     ].copy()
+    
+    # בדיקת אט"ן - חיפוש המשמרת בתבנית
+    shift_row = None
+    for idx, s in shi_df.iterrows():
+        test_key = f"{date_str}_{s['תחנה']}_{s['משמרת']}_{idx}"
+        if test_key == shift_key:
+            shift_row = s
+            break
+    
+    if shift_row is not None and "אט" in str(shift_row['סוג תקן']):
+        atan_col = get_atan_column(req_df)
+        if atan_col:
+            candidates = candidates[candidates[atan_col] == 'כן']
     
     if candidates.empty:
         st.warning("😕 אין מועמדים פנויים")
@@ -242,6 +255,7 @@ def show_assignment_dialog(shift_key, date_str, station, shift_type, req_df, bal
                 if date_str not in st.session_state.assigned_today:
                     st.session_state.assigned_today[date_str] = set()
                 st.session_state.assigned_today[date_str].add(selected)
+                st.success(f"✅ {selected} שובץ/ה!")
                 st.rerun()
         with col2:
             if st.button("❌ ביטול", use_container_width=True):
@@ -362,37 +376,44 @@ if req_file and shi_file:
         
         # כפתורי פעולה
         st.markdown("---")
-        st.markdown("### 🔧 פעולות")
+        st.markdown("### 🔧 פעולות על משמרות")
+        st.caption("💡 טיפ: לחץ על הכפתורים לניהול כל משמרת")
         
         cols = st.columns(7)
         for i, d in enumerate(dates[:7]):
             with cols[i]:
-                st.caption(f"**{get_day_name(d)}**")
+                st.markdown(f"**{get_day_name(d)}**")
+                
                 for idx in range(len(shi_df)):
                     s = shi_df.iloc[idx]
                     key = f"{d}_{s['תחנה']}_{s['משמרת']}_{idx}"
                     assigned = st.session_state.final_schedule.get(key)
                     cancelled = key in st.session_state.cancelled_shifts
                     
+                    # תווית המשמרת
+                    st.caption(f"📍 {s['משמרת']} - {s['תחנה']}")
+                    
                     if cancelled:
-                        if st.button("🔄", key=f"b_{key}", use_container_width=True):
+                        if st.button("🔄 שחזר", key=f"b_{key}", use_container_width=True, help="שחזר משמרת מבוטלת"):
                             st.session_state.cancelled_shifts.remove(key)
                             st.rerun()
                     elif assigned:
-                        if st.button(f"🗑️ {assigned[:6]}", key=f"b_{key}", use_container_width=True):
+                        if st.button(f"🗑️ {assigned[:8]}", key=f"b_{key}", use_container_width=True, help=f"הסר את {assigned}"):
                             del st.session_state.final_schedule[key]
                             if d in st.session_state.assigned_today:
                                 st.session_state.assigned_today[d].discard(assigned)
                             st.rerun()
                     else:
-                        ca, cb = st.columns([3, 1])
-                        with ca:
-                            if st.button("➕", key=f"a_{key}", use_container_width=True):
-                                show_assignment_dialog(key, d, s['תחנה'], s['משמרת'], req_df, balance)
-                        with cb:
-                            if st.button("🚫", key=f"c_{key}"):
+                        col_a, col_b = st.columns([3, 1])
+                        with col_a:
+                            if st.button("➕ שבץ", key=f"a_{key}", use_container_width=True, type="primary", help="שבץ עובד למשמרת"):
+                                show_assignment_dialog(key, d, s['תחנה'], s['משמרת'], req_df, balance, shi_df)
+                        with col_b:
+                            if st.button("🚫", key=f"c_{key}", help="בטל משמרת"):
                                 st.session_state.cancelled_shifts.add(key)
                                 st.rerun()
+                    
+                    st.markdown("---")
     
     except Exception as e:
         st.error(f"❌ {str(e)}")
